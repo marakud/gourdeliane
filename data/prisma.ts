@@ -6,9 +6,10 @@ import { PrismaPg } from "@prisma/adapter-pg";
 // le schéma). CartableFlow utilise SQLite en dev local et Postgres (Supabase)
 // en production -- voir prisma/schema.prisma vs prisma/schema.production.prisma.
 //
-// `process.env.VERCEL` est positionné automatiquement par la plateforme Vercel
-// (jamais en local, même avec `npm run build`/`NODE_ENV=production`), ce qui
-// permet de choisir le bon adapter sans dépendre de NODE_ENV.
+// L'adapter est choisi d'après le schéma de DATABASE_URL (pas d'après
+// `process.env.VERCEL`) : ainsi le chemin production (Postgres) reste
+// testable localement -- ex. `DATABASE_URL=postgresql://... npm run build:vercel`
+// contre un Supabase/Postgres jetable -- sans dépendre de la plateforme d'hébergement.
 function createAdapter() {
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) {
@@ -17,7 +18,7 @@ function createAdapter() {
     );
   }
 
-  if (process.env.VERCEL) {
+  if (databaseUrl.startsWith("postgres://") || databaseUrl.startsWith("postgresql://")) {
     return new PrismaPg(databaseUrl);
   }
 

@@ -1,5 +1,20 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Base de données (dev vs production)
+
+CartableFlow utilise deux schémas Prisma :
+
+- `prisma/schema.prisma` (SQLite) -- utilisé par défaut en dev local via `prisma.config.ts`. `npm install` déclenche automatiquement `prisma generate` (script `postinstall`).
+- `prisma/schema.production.prisma` (Postgres/Supabase) -- utilisé uniquement par le build de production (`npm run build:vercel`, déclaré comme `buildCommand` dans `vercel.json`), qui enchaîne génération du client, `prisma migrate deploy` et le seed contre `DATABASE_URL`.
+
+Les deux fichiers doivent rester synchronisés à la main (seul le `provider` du `datasource` diffère) -- voir les commentaires en tête de chaque fichier.
+
+Pour tester le pipeline de production en local contre un Postgres/Supabase jetable :
+
+```bash
+DATABASE_URL="postgresql://..." npm run build:vercel
+```
+
 ## Getting Started
 
 First, run the development server:

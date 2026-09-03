@@ -35,7 +35,8 @@ export function BottomNav() {
     >
       <ul className="mx-auto flex max-w-lg items-stretch justify-around">
         {TABS.map(({ href, label, fullLabel, icon: Icon }) => {
-          const isActive = pathname === href;
+          const isActive =
+            href === "/" ? pathname === href : pathname.startsWith(href);
           return (
             <li key={href} className="flex-1">
               <Link

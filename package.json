@@ -2,12 +2,16 @@
   "name": "cartableflow",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "build:vercel": "prisma generate --schema=prisma/schema.production.prisma && prisma migrate deploy --schema=prisma/schema.production.prisma && tsx prisma/seed.ts && next build",
     "start": "next start",
     "lint": "eslint",
+    "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed"
