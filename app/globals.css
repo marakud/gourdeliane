@@ -101,15 +101,15 @@
   --neutral-pending: #94a3b8;
   --surface-base: #fbfaff;
 
-  /* Subject color-coding palette (1-8) */
-  --subject-1: #e53935;
-  --subject-2: #fb8c00;
-  --subject-3: #fdd835;
-  --subject-4: #00897b;
-  --subject-5: #1e88e5;
-  --subject-6: #3949ab;
-  --subject-7: #d81b60;
-  --subject-8: #6d4c41;
+  /* Subject color-coding palette (1-8) -- per DESIGN.md, identical in dark mode */
+  --subject-1: #7c5cff;
+  --subject-2: #2ec4b6;
+  --subject-3: #ff6b6b;
+  --subject-4: #ffb020;
+  --subject-5: #3d8bff;
+  --subject-6: #ff7cd4;
+  --subject-7: #2ecc71;
+  --subject-8: #8c6e4e;
 }
 
 /*
@@ -119,19 +119,19 @@
  * shadcn/ui `@custom-variant dark` mechanism above is applied to <html>.
  */
 .dark {
-  --background: #121019;
+  --background: #15132b;
   --foreground: oklch(0.985 0 0);
   --card: oklch(0.205 0 0);
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: #9b81ff;
+  --primary: #9b87ff;
   --primary-foreground: #14101f;
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
-  --accent: #ffc759;
+  --accent: #ffc85c;
   --accent-foreground: #1a1400;
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
@@ -151,19 +151,10 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 
-  --success: #4ade94;
+  --success: #4ade80;
   --success-foreground: #06210f;
-  --neutral-pending: #b4c2d6;
-  --surface-base: #121019;
-
-  --subject-1: #ef5350;
-  --subject-2: #ffa726;
-  --subject-3: #ffee58;
-  --subject-4: #26a69a;
-  --subject-5: #42a5f5;
-  --subject-6: #5c6bc0;
-  --subject-7: #ec407a;
-  --subject-8: #8d6e63;
+  --neutral-pending: #7b8aa6;
+  --surface-base: #15132b;
 }
 
 @layer base {
