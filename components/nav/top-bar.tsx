@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { Settings } from "lucide-react";
 
-// Barre superieure minimale : logo/nom de l'app + acces a Reglages.
-// Reglages est volontairement hors de la barre de navigation basse a 3 onglets
+// Barre supérieure minimale : logo/nom de l'app + accès à Réglages.
+// Réglages est volontairement hors de la barre de navigation basse à 3 onglets
 // (cf. components/nav/bottom-nav.tsx) mais doit rester accessible -- c'est le
-// role de ce lien.
+// rôle de ce lien.
 export function TopBar() {
   return (
     <header className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -13,7 +13,7 @@ export function TopBar() {
       </span>
       <Link
         href="/reglages"
-        aria-label="Reglages"
+        aria-label="Réglages"
         className="flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
       >
         <Settings aria-hidden="true" className="size-6" />

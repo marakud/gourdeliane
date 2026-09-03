@@ -5,9 +5,9 @@ import { usePathname } from "next/navigation";
 import { Home, CalendarDays, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Navigation basse a 3 onglets (Accueil / Emploi du temps / Progression).
-// Coquille vide fonctionnelle pour Story 1.1 -- pas de logique metier ici,
-// juste des routes qui rendent un placeholder. Reglages est volontairement
+// Navigation basse à 3 onglets (Accueil / Emploi du temps / Progression).
+// Coquille vide fonctionnelle pour Story 1.1 -- pas de logique métier ici,
+// juste des routes qui rendent un placeholder. Réglages est volontairement
 // absent de cette barre (accessible ailleurs, cf. app/reglages).
 const TABS = [
   { href: "/", label: "Accueil", fullLabel: "Accueil", icon: Home },
@@ -43,7 +43,7 @@ export function BottomNav() {
                 aria-label={fullLabel}
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
-                  // Zone de tap >= 44px (plancher d'accessibilite, cf. spec 1.1)
+                  // Zone de tap >= 44px (plancher d'accessibilité, cf. spec 1.1)
                   "flex min-h-[56px] flex-col items-center justify-center gap-1 py-1.5 transition-colors",
                   isActive
                     ? "text-primary"
@@ -51,7 +51,7 @@ export function BottomNav() {
                 )}
               >
                 <Icon aria-hidden="true" className="size-6" />
-                {/* text-base (16px) : plancher d'accessibilite de la spec 1.1 */}
+                {/* text-base (16px) : plancher d'accessibilité de la spec 1.1 */}
                 <span className="text-base leading-none">{label}</span>
               </Link>
             </li>

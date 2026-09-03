@@ -5,8 +5,8 @@ export default function AccueilPage() {
         CartableFlow
       </h1>
       <p className="text-base text-muted-foreground">
-        Bienvenue ! Cet ecran d&apos;accueil est une coquille vide -- le
-        contenu (prochains cours, devoirs a venir, ...) arrivera avec les
+        Bienvenue ! Cet écran d&apos;accueil est une coquille vide -- le
+        contenu (prochains cours, devoirs à venir, ...) arrivera avec les
         prochaines stories.
       </p>
     </div>

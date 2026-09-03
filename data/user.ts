@@ -3,12 +3,12 @@ import { prisma } from "./prisma";
 /**
  * Garantit qu'une unique ligne `User` existe en base.
  *
- * CartableFlow n'a pas d'ecran de connexion (Story 1.1) : l'application
+ * CartableFlow n'a pas d'écran de connexion (Story 1.1) : l'application
  * fonctionne pour un unique utilisateur implicite, dont la ligne doit exister
- * des le premier demarrage (dev local via `prisma migrate dev`, ou premiere
- * requete apres un deploiement Vercel/Supabase).
+ * dès le premier démarrage (dev local via `prisma migrate dev`, ou première
+ * requête après un déploiement Vercel/Supabase).
  *
- * Idempotent : si une ligne existe deja, elle n'est pas recreee.
+ * Idempotent : si une ligne existe déjà, elle n'est pas recréée.
  */
 export async function ensureSeedUser() {
   const existing = await prisma.user.findFirst();
