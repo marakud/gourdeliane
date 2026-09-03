@@ -1,0 +1,577 @@
+<title>CartableFlow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --canvas: #F4F2FB;
+    --canvas-line: #E2DEF3;
+    --canvas-ink: #22213B;
+    --canvas-ink-soft: #6E6C8A;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --canvas: #100E22;
+      --canvas-line: #2A2650;
+      --canvas-ink: #F1EFFB;
+      --canvas-ink-soft: #A9A6C9;
+    }
+  }
+  :root[data-theme="dark"]{
+    --canvas: #100E22;
+    --canvas-line: #2A2650;
+    --canvas-ink: #F1EFFB;
+    --canvas-ink-soft: #A9A6C9;
+  }
+
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--canvas);
+    color:var(--canvas-ink);
+    font-family:'Nunito',system-ui,sans-serif;
+    padding:40px 20px 64px;
+  }
+  .page-head{
+    max-width:900px;
+    margin:0 auto 36px;
+    text-align:center;
+  }
+  .eyebrow{
+    font-family:'Nunito',sans-serif;
+    font-weight:700;
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--canvas-ink-soft);
+  }
+  .page-head h1{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:700;
+    font-size:clamp(28px,5vw,40px);
+    margin:8px 0 10px;
+    text-wrap:balance;
+    color:var(--canvas-ink);
+  }
+  .page-head p{
+    max-width:520px;
+    margin:0 auto;
+    color:var(--canvas-ink-soft);
+    font-size:15px;
+    line-height:1.6;
+  }
+
+  .stage{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:48px;
+    max-width:900px;
+    margin:0 auto;
+  }
+  .frame-block{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
+  }
+  .frame-label{
+    font-family:'Nunito',sans-serif;
+    font-weight:700;
+    font-size:13px;
+    letter-spacing:.02em;
+    color:var(--canvas-ink-soft);
+  }
+
+  /* --- phone shell (fixed app light-mode design, independent of host theme) --- */
+  .phone{
+    width:300px;
+    height:700px;
+    background:#0E0D1B;
+    border-radius:44px;
+    padding:14px;
+    box-shadow:0 24px 60px -20px rgba(30,20,80,.35), 0 0 0 1px var(--canvas-line);
+  }
+  .screen{
+    width:100%;
+    height:100%;
+    background:#FBFAFF;
+    border-radius:32px;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+    font-family:'Nunito',sans-serif;
+    color:#22213B;
+    position:relative;
+  }
+  .status-bar{
+    height:34px;
+    flex:0 0 auto;
+  }
+  .app-content{
+    flex:1 1 auto;
+    padding:4px 20px 0;
+    display:flex;
+    flex-direction:column;
+    min-height:0;
+  }
+  .app-eyebrow{
+    font-size:13px;
+    font-weight:600;
+    color:#6E6C8A;
+    margin:0 0 2px;
+  }
+  .app-title{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:700;
+    font-size:28px;
+    color:#22213B;
+    margin:0;
+  }
+  .app-subtitle{
+    font-size:13px;
+    font-weight:600;
+    color:#7C5CFF;
+    margin:6px 0 16px;
+  }
+  .header-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+  }
+  .streak-chip{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    background:#FFF1D6;
+    padding:6px 10px;
+    border-radius:9999px;
+    margin-top:2px;
+  }
+  .streak-chip b{
+    font-family:'Baloo 2',sans-serif;
+    font-size:15px;
+    color:#22213B;
+  }
+
+  .moment-card{
+    background:#FFFFFF;
+    border-radius:24px;
+    padding:10px 6px;
+    box-shadow:0 12px 28px -16px rgba(124,92,255,.35);
+    flex:0 0 auto;
+  }
+  .block + .block{
+    margin-top:6px;
+    padding-top:10px;
+    border-top:1px solid #EFECFA;
+  }
+  .block-title{
+    font-size:12px;
+    font-weight:700;
+    color:#6E6C8A;
+    margin:2px 10px 2px;
+  }
+  .check-row{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 10px;
+    border-radius:16px;
+  }
+  .check-row + .check-row{
+    margin-top:0;
+  }
+  .chip{
+    font-family:'Nunito',sans-serif;
+    font-size:10.5px;
+    font-weight:700;
+    color:#B5730B;
+    background:#FFF1D6;
+    padding:2px 8px;
+    border-radius:9999px;
+    flex:0 0 auto;
+    white-space:nowrap;
+  }
+  .subject-tag{
+    width:32px;
+    height:32px;
+    border-radius:9999px;
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-family:'Baloo 2',sans-serif;
+    font-weight:600;
+    font-size:12px;
+    color:#FFFFFF;
+  }
+  .check-label{
+    flex:1 1 auto;
+    font-size:15px;
+    font-weight:600;
+    color:#22213B;
+  }
+  .checkbox{
+    width:26px;
+    height:26px;
+    border-radius:9999px;
+    flex:0 0 auto;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .checkbox.done{ background:#2ECC71; }
+  .checkbox.pending{ border:2.5px solid #C7C4E6; background:transparent; }
+
+  .streak-row{
+    margin-top:20px;
+    display:flex;
+    align-items:center;
+    gap:14px;
+    flex:0 0 auto;
+  }
+  .streak-badge{
+    width:56px;
+    height:56px;
+    border-radius:9999px;
+    background:#FFB020;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex:0 0 auto;
+    box-shadow:0 10px 20px -10px rgba(255,176,32,.7);
+  }
+  .streak-number{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:700;
+    font-size:15px;
+    color:#22213B;
+    margin-top:1px;
+  }
+  .streak-text b{
+    font-family:'Baloo 2',sans-serif;
+    font-size:16px;
+    display:block;
+    color:#22213B;
+  }
+  .streak-text span{
+    font-size:12.5px;
+    color:#6E6C8A;
+    font-weight:600;
+  }
+
+  .empty-space{ flex:1 1 auto; }
+
+  .fab{
+    position:absolute;
+    right:20px;
+    bottom:88px;
+    width:52px;
+    height:52px;
+    border-radius:9999px;
+    background:#7C5CFF;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    box-shadow:0 14px 24px -10px rgba(124,92,255,.6);
+  }
+
+  .nav-bar{
+    flex:0 0 auto;
+    display:flex;
+    justify-content:space-around;
+    align-items:center;
+    padding:10px 12px 16px;
+    border-top:1px solid #EDEAFA;
+  }
+  .nav-item{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+    color:#B0ADD1;
+  }
+  .nav-item.active{ color:#7C5CFF; }
+  .nav-item span{
+    font-size:10.5px;
+    font-weight:700;
+  }
+  .nav-pill{
+    width:40px;
+    height:26px;
+    border-radius:9999px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .nav-item.active .nav-pill{
+    background:#EFE9FF;
+  }
+
+  /* progression screen specifics */
+  .streak-hero{
+    text-align:center;
+    padding:6px 0 4px;
+    flex:0 0 auto;
+  }
+  .streak-hero-number{
+    font-family:'Baloo 2',sans-serif;
+    font-weight:700;
+    font-size:64px;
+    color:#7C5CFF;
+    line-height:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+  }
+  .streak-hero-label{
+    font-size:13px;
+    font-weight:700;
+    color:#6E6C8A;
+    margin-top:6px;
+  }
+  .streak-hero-best{
+    font-size:12.5px;
+    color:#94A3B8;
+    font-weight:600;
+    margin-top:2px;
+  }
+  .badge-grid{
+    margin-top:18px;
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:14px;
+    flex:0 0 auto;
+  }
+  .badge-tile{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:6px;
+  }
+  .badge-circle{
+    width:56px;
+    height:56px;
+    border-radius:9999px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .badge-circle.unlocked{
+    background:#FFB020;
+    box-shadow:0 10px 18px -10px rgba(255,176,32,.65);
+  }
+  .badge-circle.locked{
+    background:transparent;
+    border:2.5px dashed #D9D6F0;
+  }
+  .badge-tile span{
+    font-size:11px;
+    font-weight:700;
+    color:#6E6C8A;
+    text-align:center;
+  }
+  .badge-tile.locked span{ color:#B7B4D6; }
+
+  @media (prefers-reduced-motion: no-preference){
+    .checkbox.done, .streak-badge{
+      animation:pop .34s cubic-bezier(.34,1.56,.64,1);
+    }
+  }
+  @keyframes pop{
+    0%{ transform:scale(.7); }
+    100%{ transform:scale(1); }
+  }
+</style>
+
+<div class="page-head">
+  <div class="eyebrow">CartableFlow · aperçu UX</div>
+  <h1>Deux écrans clés, en mode clair</h1>
+  <p>Traduction concrète des tokens de <code>DESIGN.md</code> — palette, typographies Baloo 2 / Nunito, formes arrondies. Le mode sombre suit les mêmes tokens `-dark`, non représenté ici pour rester focalisé sur l'identité.</p>
+</div>
+
+<div class="stage">
+
+  <div class="frame-block">
+    <div class="frame-label">Accueil — soir en 3 blocs + ajout devoir</div>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"></div>
+        <div class="app-content">
+          <div class="header-row">
+            <div>
+              <p class="app-eyebrow">Bonsoir</p>
+              <h2 class="app-title">Ce soir</h2>
+              <p class="app-subtitle">3 choses à finir</p>
+            </div>
+            <div class="streak-chip">
+              <svg width="14" height="17" viewBox="0 0 20 24" fill="none"><path d="M10 0C10 6 3 8 3 14.5C3 19.5 6.5 23 10.5 23C15 23 18 19.5 17.5 15C17.2 12 15.5 11 15.5 11C15.8 13.5 14.3 14.5 14.3 14.5C14.8 11 12.5 9 12.5 9C13 11.5 11.5 12.5 11.5 12.5C12 8 10 5 10 0Z" fill="#FFB020"/></svg>
+              <b>4</b>
+            </div>
+          </div>
+
+          <div class="moment-card">
+            <div class="block">
+              <p class="block-title">Sac pour demain</p>
+              <div class="check-row">
+                <div class="subject-tag" style="background:#7C5CFF;">Ma</div>
+                <div class="check-label">Cahier de maths</div>
+                <div class="checkbox done">
+                  <svg width="14" height="11" viewBox="0 0 14 11" fill="none"><path d="M1 5.5L5 9.5L13 1.5" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+              </div>
+              <div class="check-row">
+                <div class="subject-tag" style="background:#7C5CFF;">Ma</div>
+                <div class="check-label">Feuille d'exercices à rendre</div>
+                <div class="checkbox pending"></div>
+              </div>
+              <div class="check-row">
+                <div class="subject-tag" style="background:#FF6B6B;">EPS</div>
+                <div class="check-label">Tenue de sport</div>
+                <div class="checkbox pending"></div>
+              </div>
+            </div>
+
+            <div class="block">
+              <p class="block-title">Devoirs à faire</p>
+              <div class="check-row">
+                <div class="subject-tag" style="background:#7C5CFF;">Ma</div>
+                <div class="check-label">Exercices p.24</div>
+                <span class="chip">à rendre</span>
+                <div class="checkbox pending"></div>
+              </div>
+              <div class="check-row">
+                <div class="subject-tag" style="background:#3D8BFF;">Fr</div>
+                <div class="check-label">Lire chapitre 3</div>
+                <div class="checkbox pending"></div>
+              </div>
+            </div>
+
+            <div class="block">
+              <p class="block-title">Révisions du jour</p>
+              <div class="check-row">
+                <div class="subject-tag" style="background:#2EC4B6;">SVT</div>
+                <div class="check-label">Revoir le cours de SVT</div>
+                <div class="checkbox pending"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="empty-space"></div>
+        </div>
+
+        <div class="fab">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3V17M3 10H17" stroke="white" stroke-width="2.6" stroke-linecap="round"/></svg>
+        </div>
+
+        <div class="nav-bar">
+          <div class="nav-item active">
+            <div class="nav-pill">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M3 9.5L10 3L17 9.5V17H12V12H8V17H3V9.5Z" fill="#7C5CFF"/></svg>
+            </div>
+            <span>Accueil</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-pill">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="13" rx="3" stroke="#B0ADD1" stroke-width="1.6"/><path d="M3 8H17" stroke="#B0ADD1" stroke-width="1.6"/><path d="M7 2.5V5.5M13 2.5V5.5" stroke="#B0ADD1" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </div>
+            <span>Emploi du temps</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-pill">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M6 3H14V7C14 9.5 12.2 11.3 10 11.3C7.8 11.3 6 9.5 6 7V3Z" stroke="#B0ADD1" stroke-width="1.6"/><path d="M6 4H3.5C3.5 6 4.7 7.3 6 7.5" stroke="#B0ADD1" stroke-width="1.6"/><path d="M14 4H16.5C16.5 6 15.3 7.3 14 7.5" stroke="#B0ADD1" stroke-width="1.6"/><path d="M10 11.3V14" stroke="#B0ADD1" stroke-width="1.6"/><path d="M7 17H13" stroke="#B0ADD1" stroke-width="1.6" stroke-linecap="round"/><path d="M10 14V17" stroke="#B0ADD1" stroke-width="1.6"/></svg>
+            </div>
+            <span>Progression</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="frame-block">
+    <div class="frame-label">Progression</div>
+    <div class="phone">
+      <div class="screen">
+        <div class="status-bar"></div>
+        <div class="app-content">
+          <p class="app-eyebrow">Ta progression</p>
+          <h2 class="app-title" style="font-size:24px;">Progression</h2>
+
+          <div class="streak-hero">
+            <div class="streak-hero-number">
+              <svg width="26" height="31" viewBox="0 0 20 24" fill="none"><path d="M10 0C10 6 3 8 3 14.5C3 19.5 6.5 23 10.5 23C15 23 18 19.5 17.5 15C17.2 12 15.5 11 15.5 11C15.8 13.5 14.3 14.5 14.3 14.5C14.8 11 12.5 9 12.5 9C13 11.5 11.5 12.5 11.5 12.5C12 8 10 5 10 0Z" fill="#FFB020"/></svg>
+              4
+            </div>
+            <div class="streak-hero-label">jours d'affilée en ce moment</div>
+            <div class="streak-hero-best">Record personnel : 7 jours</div>
+          </div>
+
+          <div class="badge-grid">
+            <div class="badge-tile">
+              <div class="badge-circle unlocked">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#22213B"><path d="M12 1L15 8.5L23 9.2L17 14.4L18.8 22.3L12 18.1L5.2 22.3L7 14.4L1 9.2L9 8.5Z"/></svg>
+              </div>
+              <span>3 jours</span>
+            </div>
+            <div class="badge-tile">
+              <div class="badge-circle unlocked">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="#22213B"><path d="M12 1L15 8.5L23 9.2L17 14.4L18.8 22.3L12 18.1L5.2 22.3L7 14.4L1 9.2L9 8.5Z"/></svg>
+              </div>
+              <span>7 jours</span>
+            </div>
+            <div class="badge-tile locked">
+              <div class="badge-circle locked">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 1L15 8.5L23 9.2L17 14.4L18.8 22.3L12 18.1L5.2 22.3L7 14.4L1 9.2L9 8.5Z" stroke="#D9D6F0" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              </div>
+              <span>14 jours</span>
+            </div>
+            <div class="badge-tile locked">
+              <div class="badge-circle locked">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 1L15 8.5L23 9.2L17 14.4L18.8 22.3L12 18.1L5.2 22.3L7 14.4L1 9.2L9 8.5Z" stroke="#D9D6F0" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              </div>
+              <span>30 jours</span>
+            </div>
+            <div class="badge-tile locked">
+              <div class="badge-circle locked">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 1L15 8.5L23 9.2L17 14.4L18.8 22.3L12 18.1L5.2 22.3L7 14.4L1 9.2L9 8.5Z" stroke="#D9D6F0" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              </div>
+              <span>60 jours</span>
+            </div>
+            <div class="badge-tile locked">
+              <div class="badge-circle locked">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 1L15 8.5L23 9.2L17 14.4L18.8 22.3L12 18.1L5.2 22.3L7 14.4L1 9.2L9 8.5Z" stroke="#D9D6F0" stroke-width="1.6" stroke-linejoin="round"/></svg>
+              </div>
+              <span>100 jours</span>
+            </div>
+          </div>
+
+          <div class="empty-space"></div>
+        </div>
+
+        <div class="nav-bar">
+          <div class="nav-item">
+            <div class="nav-pill">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M3 9.5L10 3L17 9.5V17H12V12H8V17H3V9.5Z" stroke="#B0ADD1" stroke-width="1.6"/></svg>
+            </div>
+            <span>Accueil</span>
+          </div>
+          <div class="nav-item">
+            <div class="nav-pill">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><rect x="3" y="4" width="14" height="13" rx="3" stroke="#B0ADD1" stroke-width="1.6"/><path d="M3 8H17" stroke="#B0ADD1" stroke-width="1.6"/><path d="M7 2.5V5.5M13 2.5V5.5" stroke="#B0ADD1" stroke-width="1.6" stroke-linecap="round"/></svg>
+            </div>
+            <span>Emploi du temps</span>
+          </div>
+          <div class="nav-item active">
+            <div class="nav-pill">
+              <svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M6 3H14V7C14 9.5 12.2 11.3 10 11.3C7.8 11.3 6 9.5 6 7V3Z" stroke="#7C5CFF" stroke-width="1.6"/><path d="M6 4H3.5C3.5 6 4.7 7.3 6 7.5" stroke="#7C5CFF" stroke-width="1.6"/><path d="M14 4H16.5C16.5 6 15.3 7.3 14 7.5" stroke="#7C5CFF" stroke-width="1.6"/><path d="M10 11.3V14" stroke="#7C5CFF" stroke-width="1.6"/><path d="M7 17H13" stroke="#7C5CFF" stroke-width="1.6" stroke-linecap="round"/><path d="M10 14V17" stroke="#7C5CFF" stroke-width="1.6"/></svg>
+            </div>
+            <span>Progression</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
