@@ -1,15 +1,15 @@
 // CartableFlow -- miroir du schema.prisma pour la production (Postgres / Supabase).
-// Utilise par le pipeline de deploiement Vercel :
+// Utilisé par le pipeline de déploiement Vercel :
 //   npx prisma generate --schema=prisma/schema.production.prisma
 //   npx prisma migrate deploy --schema=prisma/schema.production.prisma
-// Garder ce fichier synchronise avec prisma/schema.prisma (seul le "provider" du
-// datasource change). Voir README / .env.example pour le detail du pipeline.
+// Garder ce fichier synchronisé avec prisma/schema.prisma (seul le "provider" du
+// datasource change). Voir README / .env.example pour le détail du pipeline.
 
 generator client {
   provider = "prisma-client-js"
 }
 
-// Prisma 7 : l'URL de connexion ne vit plus dans le schema (voir schema.prisma).
+// Prisma 7 : l'URL de connexion ne vit plus dans le schéma (voir schema.prisma).
 datasource db {
   provider = "postgresql"
 }

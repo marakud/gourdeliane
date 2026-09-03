@@ -1,16 +1,16 @@
-// CartableFlow -- schema Prisma initial (Story 1.1)
-// Un seul modele : User (id uniquement, pas de champ auth -- pas d'ecran de connexion).
-// Ce fichier est le schema de DEV LOCAL (provider "sqlite"). Prisma n'autorise pas de
+// CartableFlow -- schéma Prisma initial (Story 1.1)
+// Un seul modèle : User (id uniquement, pas de champ auth -- pas d'écran de connexion).
+// Ce fichier est le schéma de DEV LOCAL (provider "sqlite"). Prisma n'autorise pas de
 // provider dynamique via env() sur un datasource : le pendant production (Postgres /
-// Supabase) vit dans prisma/schema.production.prisma et doit rester synchronise avec
-// celui-ci (seul le "provider" du datasource differe). Voir README / .env.example.
-// Les modeles des epics suivants (Subject, ScheduleSlot, ...) arrivent en Story 1.2+.
+// Supabase) vit dans prisma/schema.production.prisma et doit rester synchronisé avec
+// celui-ci (seul le "provider" du datasource diffère). Voir README / .env.example.
+// Les modèles des epics suivants (Subject, ScheduleSlot, ...) arrivent en Story 1.2+.
 
 generator client {
   provider = "prisma-client-js"
 }
 
-// Prisma 7 : l'URL de connexion ne vit plus dans le schema (elle est fournie
+// Prisma 7 : l'URL de connexion ne vit plus dans le schéma (elle est fournie
 // via prisma.config.ts pour le CLI, et via un driver adapter pour le runtime --
 // voir data/prisma.ts). Voir https://pris.ly/d/prisma7-client-config
 datasource db {
