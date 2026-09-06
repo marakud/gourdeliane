@@ -2,12 +2,17 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Base de données (dev vs production)
 
-CartableFlow utilise deux schémas Prisma :
+CartableFlow utilise deux schémas Prisma, chacun avec son propre dossier de
+migrations (Prisma verrouille le provider d'un dossier de migrations dans
+`migration_lock.toml` -- les partager entre SQLite et Postgres casse `migrate
+deploy` avec l'erreur P3019) :
 
-- `prisma/schema.prisma` (SQLite) -- utilisé par défaut en dev local via `prisma.config.ts`. `npm install` déclenche automatiquement `prisma generate` (script `postinstall`).
-- `prisma/schema.production.prisma` (Postgres/Supabase) -- utilisé uniquement par le build de production (`npm run build:vercel`, déclaré comme `buildCommand` dans `vercel.json`), qui enchaîne génération du client, `prisma migrate deploy` et le seed contre `DATABASE_URL`.
+- `prisma/schema.prisma` + `prisma/migrations/` (SQLite) -- utilisé par défaut en dev local via `prisma.config.ts`. `npm install` déclenche automatiquement `prisma generate` (script `postinstall`).
+- `prisma/production/schema.prisma` + `prisma/production/migrations/` (Postgres/Supabase) -- utilisé uniquement par le build de production (`npm run build:vercel`, déclaré comme `buildCommand` dans `vercel.json`), qui enchaîne génération du client, `prisma migrate deploy` et le seed contre `DATABASE_URL`.
 
-Les deux fichiers doivent rester synchronisés à la main (seul le `provider` du `datasource` diffère) -- voir les commentaires en tête de chaque fichier.
+Les deux schémas doivent rester synchronisés à la main (seul le `provider` du `datasource` diffère) -- voir les commentaires en tête de chaque fichier. Idem pour leurs migrations : toute évolution du modèle doit être répercutée dans les deux dossiers (`prisma migrate dev` pour SQLite, `prisma migrate diff --from-empty --to-schema prisma/production/schema.prisma --script` pour générer le SQL Postgres équivalent hors-ligne, sans connexion réelle).
+
+⚠️ Sur Supabase, utilise la connection string **Session pooler** (port `5432`, hôte `*.pooler.supabase.com`) pour `DATABASE_URL`, pas le Transaction pooler (port `6543`) : `prisma migrate deploy` a besoin d'une connexion qui tient un état de session, ce que le mode transaction ne permet pas.
 
 Pour tester le pipeline de production en local contre un Postgres/Supabase jetable :
 

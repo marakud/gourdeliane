@@ -2,8 +2,9 @@
 // Un seul modèle : User (id uniquement, pas de champ auth -- pas d'écran de connexion).
 // Ce fichier est le schéma de DEV LOCAL (provider "sqlite"). Prisma n'autorise pas de
 // provider dynamique via env() sur un datasource : le pendant production (Postgres /
-// Supabase) vit dans prisma/schema.production.prisma et doit rester synchronisé avec
-// celui-ci (seul le "provider" du datasource diffère). Voir README / .env.example.
+// Supabase) vit dans prisma/production/schema.prisma (dossier de migrations séparé,
+// voir README) et doit rester synchronisé avec celui-ci (seul le "provider" du
+// datasource diffère). Voir README / .env.example.
 // Les modèles des epics suivants (Subject, ScheduleSlot, ...) arrivent en Story 1.2+.
 
 generator client {

@@ -1,0 +1,24 @@
+// CartableFlow -- miroir de prisma/schema.prisma pour la production (Postgres / Supabase).
+// Utilisé par le pipeline de déploiement Vercel :
+//   npx prisma generate --schema=prisma/production/schema.prisma
+//   npx prisma migrate deploy --schema=prisma/production/schema.prisma
+// Vit dans son propre dossier (avec ses propres migrations en sibling) car Prisma
+// verrouille le provider d'un dossier de migrations dans migration_lock.toml --
+// partager prisma/migrations/ avec le schéma SQLite de dev provoque l'erreur P3019
+// ("datasource provider ... does not match ... migration_lock.toml").
+// Garder ce fichier synchronisé avec prisma/schema.prisma (seul le "provider" du
+// datasource change). Voir README / .env.example pour le détail du pipeline.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Prisma 7 : l'URL de connexion ne vit plus dans le schéma (voir schema.prisma).
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+}

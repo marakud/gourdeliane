@@ -4,7 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 
 // Prisma 7 : le client a besoin d'un driver adapter explicite (plus d'URL dans
 // le schéma). CartableFlow utilise SQLite en dev local et Postgres (Supabase)
-// en production -- voir prisma/schema.prisma vs prisma/schema.production.prisma.
+// en production -- voir prisma/schema.prisma vs prisma/production/schema.prisma.
 //
 // L'adapter est choisi d'après le schéma de DATABASE_URL (pas d'après
 // `process.env.VERCEL`) : ainsi le chemin production (Postgres) reste

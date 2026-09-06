@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "build:vercel": "prisma generate --schema=prisma/schema.production.prisma && prisma migrate deploy --schema=prisma/schema.production.prisma && tsx prisma/seed.ts && next build",
+    "build:vercel": "prisma generate --schema=prisma/production/schema.prisma && prisma migrate deploy --schema=prisma/production/schema.prisma && tsx prisma/seed.ts && next build",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
