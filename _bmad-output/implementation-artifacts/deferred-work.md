@@ -25,3 +25,15 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-2-gerer-mon-emploi-du-temps.md`
   summary: DESIGN.md's subject color palette (subject-1..8) is fixed at 8 colors; a user with more than 8 active subjects gets visually duplicate subject-tag colors (the "cyclique" behavior DESIGN.md itself specifies).
   evidence: Surfaced during Story 1.2 implementation while wiring `assignNextColorIndex` exactly per AD-6/DESIGN.md. A French collège student realistically has 10+ distinct subjects, so this will likely be hit in normal use, not just as a theoretical edge case. Fixing it (extending the palette, or adding a secondary visual differentiator) is a product/design decision for DESIGN.md, outside any single implementation story's scope -- flagging for whoever owns UX decisions next.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-3-voir-ma-journee-et-mon-lendemain.md`
+  summary: The "Aujourd'hui"/"Demain" day views show no date/weekday heading (e.g. "Lundi 8 septembre") -- only the tab label and the slot list, so there's no on-screen confirmation of exactly which calendar date is being shown.
+  evidence: Blind-hunter review. Not required by any spec 1.3 acceptance criterion. `domain/school-day.ts` already computes the ISO date, so surfacing it is a small follow-up whenever this screen gets revisited.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-3-voir-ma-journee-et-mon-lendemain.md`
+  summary: No visual indicator in the "Semaine" tab for which day column is "today", even though the app now has a well-defined notion of "today" (domain/school-day.ts).
+  evidence: Blind-hunter review. Nice-to-have now that Story 1.3 introduced the concept explicitly; not required by any acceptance criterion.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-1-3-voir-ma-journee-et-mon-lendemain.md`
+  summary: `parisDateParts` (domain/school-day.ts) has no guard against `Intl.DateTimeFormat` ever returning parts that don't parse to valid numbers (would silently produce NaN dates).
+  evidence: Edge-case-hunter and blind-hunter both flagged it. Practically unreachable with a hardcoded, valid IANA zone name ("Europe/Paris") on any real JS runtime (Vercel/Node ship full ICU data) -- not worth a runtime guard now, but a cheap one to add if this function is ever touched again.

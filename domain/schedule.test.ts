@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { assignNextColorIndex, validateSlot } from "./schedule";
+import {
+  assignNextColorIndex,
+  deriveDaySlots,
+  validateSlot,
+  type DaySlot,
+} from "./schedule";
 
 describe("assignNextColorIndex (AD-6)", () => {
   it("assigns colorIndex 1 to the first subject", () => {
@@ -68,5 +73,44 @@ describe("validateSlot (I/O matrix spec 1.2)", () => {
   it("rejects an empty subject name", () => {
     const result = validateSlot({ ...base, subjectName: "   " });
     expect(result.valid).toBe(false);
+  });
+});
+
+describe("deriveDaySlots (I/O matrix spec 1.3)", () => {
+  const maths: DaySlot["subject"] = { name: "Maths", colorIndex: 1 };
+  const allSlots: DaySlot[] = [
+    { id: "1", weekday: "MONDAY", startTime: "10:00", endTime: "11:00", subject: maths },
+    { id: "2", weekday: "MONDAY", startTime: "08:00", endTime: "09:00", subject: maths },
+    { id: "3", weekday: "TUESDAY", startTime: "08:00", endTime: "09:00", subject: maths },
+  ];
+
+  it("filters by weekday and sorts by start time", () => {
+    const result = deriveDaySlots(allSlots, "MONDAY", "2026-09-07", new Set());
+    expect(result.map((s) => s.id)).toEqual(["2", "1"]);
+  });
+
+  it("returns an empty list for a weekday with no slots", () => {
+    const result = deriveDaySlots(allSlots, "SUNDAY", "2026-09-06", new Set());
+    expect(result).toEqual([]);
+  });
+
+  it("returns an empty list when the date is marked no-school, even if the weekday normally has slots", () => {
+    const result = deriveDaySlots(
+      allSlots,
+      "MONDAY",
+      "2026-09-07",
+      new Set(["2026-09-07"])
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("is unaffected by a no-school date that doesn't match the day being derived", () => {
+    const result = deriveDaySlots(
+      allSlots,
+      "MONDAY",
+      "2026-09-07",
+      new Set(["2026-09-08"])
+    );
+    expect(result.map((s) => s.id)).toEqual(["2", "1"]);
   });
 });

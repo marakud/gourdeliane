@@ -107,3 +107,35 @@ export function validateSlot(input: ScheduleSlotInput): SlotValidationResult {
 
   return { valid: true };
 }
+
+export interface DaySlot {
+  id: string;
+  weekday: Weekday;
+  startTime: string;
+  endTime: string;
+  subject: { name: string; colorIndex: number };
+}
+
+/**
+ * Dérive les créneaux d'un jour donné (Story 1.3, vues "Aujourd'hui"/"Demain") :
+ * filtre par `weekday` et trie par heure, sauf si `dateIso` est marqué "sans
+ * cours" -- auquel cas la liste est vide même si des créneaux récurrents
+ * existent normalement ce jour de la semaine (un jour férié/de vacances
+ * annule les cours de ce jour-là, cf. spec 1.3 I/O matrix). Pure : ne
+ * distingue pas "sans cours explicite" de "aucun créneau saisi ce jour-là" --
+ * les deux produisent une liste vide, à l'appelant de choisir le message.
+ */
+export function deriveDaySlots(
+  allSlots: readonly DaySlot[],
+  weekday: Weekday,
+  dateIso: string,
+  noSchoolDayIsoSet: ReadonlySet<string>
+): DaySlot[] {
+  if (noSchoolDayIsoSet.has(dateIso)) {
+    return [];
+  }
+
+  return allSlots
+    .filter((slot) => slot.weekday === weekday)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+}
