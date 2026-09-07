@@ -2,15 +2,19 @@
 
 import { useState, useTransition } from "react";
 import { Check } from "lucide-react";
-import { toggleMatinChecklistItem } from "@/actions/checklist";
+import type { ActionResult, ToggleChecklistItemInput } from "@/actions/checklist";
 import { cn } from "@/lib/utils";
 
-// Bloc "Ce matin" (Accueil, Story 2.2). Reçoit la checklist déjà dérivée par
-// domain/checklist.ts::deriveFixedChecklist -- liste plate (pas de
+// Bloc liste plate fixe (Accueil) -- posé pour "Ce matin" en Story 2.2,
+// généralisé en Story 2.3 pour servir aussi "Retour" sans dupliquer ce
+// composant (Boundaries spec 2.3 : Matin doit continuer de fonctionner sans
+// régression après cette généralisation). Reçoit la checklist déjà dérivée
+// par domain/checklist.ts::deriveFixedChecklist -- liste plate (pas de
 // groupement par matière, contrairement au sac, cf. Never de la spec 2.2).
 // Même mécanique de mise à jour optimiste que SacChecklist
-// (components/checklist/sac-checklist.tsx), via `toggleMatinChecklistItem`
-// (actions/checklist.ts) plutôt que `toggleChecklistItem` directement.
+// (components/checklist/sac-checklist.tsx), via la Server Action de
+// cochage reçue en prop (`toggleMatinChecklistItem`/`toggleRetourChecklistItem`,
+// actions/checklist.ts) plutôt qu'appelée en dur ici.
 
 export interface FixedChecklistItemView {
   sourceId: string;
@@ -18,16 +22,35 @@ export interface FixedChecklistItemView {
   checked: boolean;
 }
 
+/** Signature partagée par `toggleMatinChecklistItem` et
+ * `toggleRetourChecklistItem` (actions/checklist.ts) -- ce composant n'a pas
+ * à connaître `checklistType`/`sourceType`, déjà fixés par le wrapper que
+ * l'appelant transmet. */
+export type ToggleFixedChecklistItemAction = (
+  input: Omit<ToggleChecklistItemInput, "checklistType" | "sourceType">
+) => Promise<ActionResult<null>>;
+
 export interface FixedChecklistProps {
   title: string;
   items: FixedChecklistItemView[];
-  // Jour pour lequel la checklist est préparée ("aujourd'hui" pour Matin,
-  // AD-4) -- transmis tel quel à la Server Action (déjà calculé côté serveur
-  // par app/(accueil)/page.tsx, jamais recalculé ici).
+  // Jour pour lequel la checklist est préparée ("aujourd'hui" pour Matin
+  // comme pour Retour, AD-4) -- transmis tel quel à la Server Action (déjà
+  // calculé côté serveur par app/(accueil)/page.tsx, jamais recalculé ici).
   dateIso: string;
+  // `id` du <h2> pour `aria-labelledby` -- doit être unique par instance
+  // puisque Matin et Retour s'affichent tous deux sur Accueil (ex.
+  // "matin-heading" / "retour-heading").
+  headingId: string;
+  onToggle: ToggleFixedChecklistItemAction;
 }
 
-export function FixedChecklist({ title, items, dateIso }: FixedChecklistProps) {
+export function FixedChecklist({
+  title,
+  items,
+  dateIso,
+  headingId,
+  onToggle,
+}: FixedChecklistProps) {
   const [checkedById, setCheckedById] = useState<Record<string, boolean>>(
     () => {
       const initial: Record<string, boolean> = {};
@@ -52,7 +75,7 @@ export function FixedChecklist({ title, items, dateIso }: FixedChecklistProps) {
     setCheckedById((prev) => ({ ...prev, [sourceId]: next }));
 
     startTransition(async () => {
-      const result = await toggleMatinChecklistItem({
+      const result = await onToggle({
         date: dateIso,
         sourceId,
         checked: next,
@@ -72,12 +95,12 @@ export function FixedChecklist({ title, items, dateIso }: FixedChecklistProps) {
 
   return (
     <section
-      aria-labelledby="matin-heading"
+      aria-labelledby={headingId}
       className="flex flex-col gap-4 rounded-2xl bg-card p-4 ring-1 ring-border"
     >
       <div className="flex items-center justify-between gap-2">
         <h2
-          id="matin-heading"
+          id={headingId}
           className="font-heading text-lg font-semibold text-foreground"
         >
           {title}

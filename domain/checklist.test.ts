@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
   CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
+  CHECKLIST_TYPE_MATIN,
+  CHECKLIST_TYPE_RETOUR,
+  DEFAULT_RETOUR_ITEMS,
   deriveFixedChecklist,
   deriveSacChecklist,
   type ChecklistItemStateInput,
@@ -235,5 +238,61 @@ describe("deriveFixedChecklist (spec 2.2 I/O matrix)", () => {
     const result = deriveFixedChecklist(items, states);
 
     expect(result[0].checked).toBe(false);
+  });
+});
+
+describe("deriveFixedChecklist -- Retour (spec 2.3 I/O matrix, mêmes cas que Matin)", () => {
+  it("has its own checklistType and default labels, distinct from Matin", () => {
+    expect(CHECKLIST_TYPE_RETOUR).toBe("RETOUR");
+    expect(CHECKLIST_TYPE_RETOUR).not.toBe(CHECKLIST_TYPE_MATIN);
+    expect(DEFAULT_RETOUR_ITEMS).toEqual([
+      "Sortir le carnet/mot",
+      "Ranger le sac",
+      "Devoirs faits",
+    ]);
+  });
+
+  it("returns the default Retour list unchecked (première consultation)", () => {
+    const items: FixedChecklistItemInput[] = DEFAULT_RETOUR_ITEMS.map(
+      (label, index) => ({ id: `item-retour-${index}`, label })
+    );
+
+    const result = deriveFixedChecklist(items, []);
+
+    expect(result).toEqual(
+      DEFAULT_RETOUR_ITEMS.map((label, index) => ({
+        sourceId: `item-retour-${index}`,
+        label,
+        checked: false,
+      }))
+    );
+  });
+
+  it("reflects an existing checked state keyed by sourceId, same mechanism as Matin", () => {
+    const items: FixedChecklistItemInput[] = [
+      { id: "item-carnet", label: "Sortir le carnet/mot" },
+    ];
+    const states: ChecklistItemStateInput[] = [
+      {
+        sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+        sourceId: "item-carnet",
+        checked: true,
+      },
+    ];
+
+    const result = deriveFixedChecklist(items, states);
+
+    expect(result[0].checked).toBe(true);
+  });
+
+  it("shows all items unchecked on a new school day (états d'une autre date, jamais transmis ici)", () => {
+    const items: FixedChecklistItemInput[] = [
+      { id: "item-carnet", label: "Sortir le carnet/mot" },
+      { id: "item-sac", label: "Ranger le sac" },
+    ];
+
+    const result = deriveFixedChecklist(items, []);
+
+    expect(result.every((item) => item.checked === false)).toBe(true);
   });
 });

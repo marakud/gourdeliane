@@ -1,7 +1,15 @@
 import "dotenv/config";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { prisma } from "../data/prisma";
-import { toggleChecklistItem, toggleMatinChecklistItem } from "./checklist";
+import { ensureSeedUser } from "../data/user";
+import { listFixedChecklistItems } from "../data/checklist";
+import { CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS } from "../domain/checklist";
+import {
+  createRetourChecklistItem,
+  toggleChecklistItem,
+  toggleMatinChecklistItem,
+  toggleRetourChecklistItem,
+} from "./checklist";
 
 // Tests d'intégration contre la vraie base de dev (SQLite). Contrairement à
 // data/schedule.test.ts / data/checklist.test.ts (fonctions data/ prenant un
@@ -19,11 +27,17 @@ const TEST_SOURCE_IDS = [
   "action-test-bad-type",
   "action-test-bad-source",
   "action-test-matin-item",
+  "action-test-retour-item",
 ];
+
+const TEST_RETOUR_CREATE_LABEL = "action-test-retour-create-label";
 
 afterEach(async () => {
   await prisma.checklistItemState.deleteMany({
     where: { sourceId: { in: TEST_SOURCE_IDS } },
+  });
+  await prisma.fixedChecklistItem.deleteMany({
+    where: { label: TEST_RETOUR_CREATE_LABEL },
   });
 });
 
@@ -89,5 +103,84 @@ describe("toggleMatinChecklistItem -- wrapper MATIN/FIXED_ITEM (spec 2.2)", () =
     expect(rows).toHaveLength(1);
     expect(rows[0].checklistType).toBe("MATIN");
     expect(rows[0].sourceType).toBe("FIXED_ITEM");
+  });
+});
+
+describe("toggleRetourChecklistItem -- wrapper RETOUR/FIXED_ITEM (spec 2.3)", () => {
+  it("écrit RETOUR/FIXED_ITEM sans que l'appelant ait à connaître ces constantes", async () => {
+    const result = await toggleRetourChecklistItem({
+      date: "2026-12-20",
+      sourceId: "action-test-retour-item",
+      checked: true,
+    });
+
+    expect(result.ok).toBe(true);
+
+    const rows = await prisma.checklistItemState.findMany({
+      where: { sourceId: "action-test-retour-item" },
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].checklistType).toBe("RETOUR");
+    expect(rows[0].sourceType).toBe("FIXED_ITEM");
+  });
+
+  it("reste indépendant de MATIN -- même sourceId, checklistType différent, deux lignes distinctes", async () => {
+    await toggleMatinChecklistItem({
+      date: "2026-12-20",
+      sourceId: "action-test-matin-item",
+      checked: true,
+    });
+    await toggleRetourChecklistItem({
+      date: "2026-12-20",
+      sourceId: "action-test-matin-item",
+      checked: false,
+    });
+
+    const rows = await prisma.checklistItemState.findMany({
+      where: { sourceId: "action-test-matin-item" },
+      orderBy: { checklistType: "asc" },
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.checklistType === "MATIN")?.checked).toBe(true);
+    expect(rows.find((row) => row.checklistType === "RETOUR")?.checked).toBe(false);
+  });
+});
+
+describe("createRetourChecklistItem -- création RETOUR (spec 2.3)", () => {
+  it("crée un FixedChecklistItem de type RETOUR", async () => {
+    const result = await createRetourChecklistItem({
+      label: TEST_RETOUR_CREATE_LABEL,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const item = await prisma.fixedChecklistItem.findUnique({
+      where: { id: result.data.id },
+    });
+    expect(item?.checklistType).toBe("RETOUR");
+    expect(item?.label).toBe(TEST_RETOUR_CREATE_LABEL);
+  });
+
+  it("rejette un label vide", async () => {
+    const result = await createRetourChecklistItem({ label: "   " });
+    expect(result.ok).toBe(false);
+  });
+
+  it("ne fuite pas dans la liste MATIN (types indépendants)", async () => {
+    const result = await createRetourChecklistItem({
+      label: TEST_RETOUR_CREATE_LABEL,
+    });
+    expect(result.ok).toBe(true);
+
+    const user = await ensureSeedUser();
+    const matinItems = await listFixedChecklistItems(
+      user.id,
+      CHECKLIST_TYPE_MATIN,
+      DEFAULT_MATIN_ITEMS
+    );
+    expect(
+      matinItems.some((item) => item.label === TEST_RETOUR_CREATE_LABEL)
+    ).toBe(false);
   });
 });

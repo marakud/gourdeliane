@@ -1,7 +1,16 @@
 import { connection } from "next/server";
 import { ensureSeedUser } from "@/data/user";
 import { listFixedChecklistItems, listSubjectsWithItems } from "@/data/checklist";
-import { CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS } from "@/domain/checklist";
+import {
+  CHECKLIST_TYPE_MATIN,
+  CHECKLIST_TYPE_RETOUR,
+  DEFAULT_MATIN_ITEMS,
+  DEFAULT_RETOUR_ITEMS,
+} from "@/domain/checklist";
+import {
+  createFixedChecklistItem,
+  createRetourChecklistItem,
+} from "@/actions/checklist";
 import { SubjectItemsManager } from "@/components/checklist/subject-items-manager";
 import { FixedItemsManager } from "@/components/checklist/fixed-items-manager";
 
@@ -13,9 +22,10 @@ export default async function ReglagesPage() {
   await connection();
 
   const user = await ensureSeedUser();
-  const [subjects, matinItems] = await Promise.all([
+  const [subjects, matinItems, retourItems] = await Promise.all([
     listSubjectsWithItems(user.id),
     listFixedChecklistItems(user.id, CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS),
+    listFixedChecklistItems(user.id, CHECKLIST_TYPE_RETOUR, DEFAULT_RETOUR_ITEMS),
   ]);
 
   return (
@@ -46,6 +56,13 @@ export default async function ReglagesPage() {
       <FixedItemsManager
         title="Ce matin"
         items={matinItems.map((item) => ({ id: item.id, label: item.label }))}
+        createAction={createFixedChecklistItem}
+      />
+
+      <FixedItemsManager
+        title="Retour"
+        items={retourItems.map((item) => ({ id: item.id, label: item.label }))}
+        createAction={createRetourChecklistItem}
       />
     </div>
   );

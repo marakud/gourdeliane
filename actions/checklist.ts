@@ -5,6 +5,7 @@ import {
   CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
   CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
   CHECKLIST_TYPE_MATIN,
+  CHECKLIST_TYPE_RETOUR,
   CHECKLIST_TYPE_SAC,
 } from "@/domain/checklist";
 import { ensureSeedUser } from "@/data/user";
@@ -85,6 +86,7 @@ export interface ToggleChecklistItemInput {
 const KNOWN_CHECKLIST_TYPES = new Set<string>([
   CHECKLIST_TYPE_SAC,
   CHECKLIST_TYPE_MATIN,
+  CHECKLIST_TYPE_RETOUR,
 ]);
 const KNOWN_SOURCE_TYPES = new Set<string>([
   CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
@@ -195,9 +197,12 @@ export async function deleteSubjectItem(
 
 // Story 2.2 -- gestion des items de "Ce matin" depuis Réglages. Le
 // `checklistType` reste "MATIN" en dur ici (pas transmis par l'appelant) :
-// ce fichier est l'unique point d'entrée mutation, et Retour (Story 2.3)
-// ajoutera ses propres actions dédiées plutôt que de paramétrer celles-ci --
-// même choix que la génération séparée SubjectItem vs FixedChecklistItem.
+// ce fichier est l'unique point d'entrée mutation, et Retour (Story 2.3,
+// plus bas) a ses propres actions dédiées plutôt que de paramétrer
+// celles-ci -- même choix que la génération séparée SubjectItem vs
+// FixedChecklistItem. `updateFixedChecklistItem`/`deleteFixedChecklistItem`
+// restent en revanche partagées : scopées par `id` (pas par `checklistType`),
+// elles sont déjà génériques et servent Matin comme Retour telles quelles.
 
 export interface FixedChecklistItemFormInput {
   label: string;
@@ -275,6 +280,53 @@ export async function toggleMatinChecklistItem(
   return toggleChecklistItem({
     ...input,
     checklistType: CHECKLIST_TYPE_MATIN,
+    sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+  });
+}
+
+// Story 2.3 -- "Retour", même mécanisme exact que Matin ci-dessus : deuxième
+// consommateur de `FixedChecklistItem`/`ChecklistItemState`, avec
+// `checklistType="RETOUR"`. `components/checklist/fixed-checklist.tsx` et
+// `fixed-items-manager.tsx` reçoivent désormais ces actions en props plutôt
+// que d'appeler leur équivalent Matin en dur (généralisation spec 2.3) --
+// c'est ce qui permet à ce même couple de composants de servir les deux
+// checklists sans être dupliqué.
+
+/** Crée un item de "Retour" depuis Réglages -- même schéma que
+ * `createFixedChecklistItem` (Matin), `checklistType` fixé à RETOUR ici. */
+export async function createRetourChecklistItem(
+  input: FixedChecklistItemFormInput
+): Promise<ActionResult<{ id: string }>> {
+  const label = input.label.trim();
+  if (label.length === 0) {
+    return { ok: false, error: "Le nom de l'item est requis." };
+  }
+
+  try {
+    const user = await ensureSeedUser();
+    const item = await createFixedChecklistItemData(
+      user.id,
+      CHECKLIST_TYPE_RETOUR,
+      label
+    );
+    revalidateReglages();
+    revalidateAccueil();
+    return { ok: true, data: { id: item.id } };
+  } catch (error) {
+    console.error("createRetourChecklistItem failed:", error);
+    return { ok: false, error: "Impossible d'ajouter l'item. Réessaie." };
+  }
+}
+
+/** Coche/décoche un item de "Retour" -- wrapper de `toggleChecklistItem`
+ * avec `checklistType`/`sourceType` fixés à RETOUR/FIXED_ITEM, même rôle que
+ * `toggleMatinChecklistItem` pour Matin. */
+export async function toggleRetourChecklistItem(
+  input: Omit<ToggleChecklistItemInput, "checklistType" | "sourceType">
+): Promise<ActionResult<null>> {
+  return toggleChecklistItem({
+    ...input,
+    checklistType: CHECKLIST_TYPE_RETOUR,
     sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
   });
 }

@@ -32,6 +32,25 @@ export const DEFAULT_MATIN_ITEMS = [
   "Chargeur",
 ] as const;
 
+// Story 2.3 -- checklist fixe "Retour", même mécanisme exact que Matin
+// ci-dessus, avec `checklistType="RETOUR"` et ses propres défauts. Partage
+// `CHECKLIST_SOURCE_TYPE_FIXED_ITEM` avec Matin : ce qui distingue les deux
+// checklists est `checklistType` sur `ChecklistItemState`/`FixedChecklistItem`
+// (déjà filtré par l'appelant, cf. data/checklist.ts), pas `sourceType`.
+export const CHECKLIST_TYPE_RETOUR = "RETOUR" as const;
+
+/**
+ * Liste par défaut pré-remplie à la toute première consultation de "Retour"
+ * pour un utilisateur (même mécanisme que `DEFAULT_MATIN_ITEMS` -- détectée
+ * par "aucun `FixedChecklistItem` de type RETOUR pour cet utilisateur",
+ * jamais recréée ensuite).
+ */
+export const DEFAULT_RETOUR_ITEMS = [
+  "Sortir le carnet/mot",
+  "Ranger le sac",
+  "Devoirs faits",
+] as const;
+
 /** Un objet par défaut d'une matière (`SubjectItem`), tel que chargé par data/checklist.ts. */
 export interface ChecklistSubjectItemInput {
   id: string;

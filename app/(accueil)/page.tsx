@@ -15,12 +15,18 @@ import {
 } from "@/domain/school-day";
 import {
   CHECKLIST_TYPE_MATIN,
+  CHECKLIST_TYPE_RETOUR,
   CHECKLIST_TYPE_SAC,
   DEFAULT_MATIN_ITEMS,
+  DEFAULT_RETOUR_ITEMS,
   deriveFixedChecklist,
   deriveSacChecklist,
   type ChecklistSubjectGroupInput,
 } from "@/domain/checklist";
+import {
+  toggleMatinChecklistItem,
+  toggleRetourChecklistItem,
+} from "@/actions/checklist";
 import { SacChecklist } from "@/components/checklist/sac-checklist";
 import { FixedChecklist } from "@/components/checklist/fixed-checklist";
 
@@ -116,14 +122,33 @@ export default async function AccueilPage() {
   const todayIso = schoolDateToIso(todayDate);
   const todayDateAsDate = new Date(`${todayIso}T00:00:00.000Z`);
 
-  const [matinItems, matinCheckedStates] = await Promise.all([
-    listFixedChecklistItems(user.id, CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS),
-    listChecklistItemStates(user.id, todayDateAsDate, CHECKLIST_TYPE_MATIN),
-  ]);
+  // "Retour" (Story 2.3) : même mécanisme exact que "Ce matin" ci-dessus --
+  // porte sur AUJOURD'HUI (AD-4), indépendant de l'EDT, toujours affiché.
+  // Types distincts (`CHECKLIST_TYPE_RETOUR` vs `CHECKLIST_TYPE_MATIN`) :
+  // cocher un item de l'un n'affecte jamais l'état de l'autre (I/O matrix
+  // spec 2.3). Les 4 requêtes Matin+Retour sont batchées dans un seul
+  // Promise.all (indépendantes entre elles) plutôt que deux Promise.all
+  // séquentiels, pour ne pas payer un aller-retour DB supplémentaire.
+  const [matinItems, matinCheckedStates, retourItems, retourCheckedStates] =
+    await Promise.all([
+      listFixedChecklistItems(user.id, CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS),
+      listChecklistItemStates(user.id, todayDateAsDate, CHECKLIST_TYPE_MATIN),
+      listFixedChecklistItems(user.id, CHECKLIST_TYPE_RETOUR, DEFAULT_RETOUR_ITEMS),
+      listChecklistItemStates(user.id, todayDateAsDate, CHECKLIST_TYPE_RETOUR),
+    ]);
 
   const matinChecklist = deriveFixedChecklist(
     matinItems.map((item) => ({ id: item.id, label: item.label })),
     matinCheckedStates.map((state) => ({
+      sourceType: state.sourceType,
+      sourceId: state.sourceId,
+      checked: state.checked,
+    }))
+  );
+
+  const retourChecklist = deriveFixedChecklist(
+    retourItems.map((item) => ({ id: item.id, label: item.label })),
+    retourCheckedStates.map((state) => ({
       sourceType: state.sourceType,
       sourceId: state.sourceId,
       checked: state.checked,
@@ -153,6 +178,16 @@ export default async function AccueilPage() {
         title="Ce matin"
         items={matinChecklist}
         dateIso={todayIso}
+        headingId="matin-heading"
+        onToggle={toggleMatinChecklistItem}
+      />
+
+      <FixedChecklist
+        title="Retour"
+        items={retourChecklist}
+        dateIso={todayIso}
+        headingId="retour-heading"
+        onToggle={toggleRetourChecklistItem}
       />
     </div>
   );
