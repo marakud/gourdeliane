@@ -2,7 +2,7 @@
 title: 'Story 2.3 — Cocher mes routines fixes du retour'
 type: 'feature'
 created: '2026-09-07'
-status: 'review'
+status: 'done'
 review_loop_iteration: 1
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
