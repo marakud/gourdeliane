@@ -13,6 +13,25 @@
 export const CHECKLIST_TYPE_SAC = "SAC" as const;
 export const CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM = "SUBJECT_ITEM" as const;
 
+// Story 2.2 -- checklist fixe "Ce matin" (Retour, Story 2.3, réutilisera le
+// même modèle avec CHECKLIST_TYPE_RETOUR). Écrites en toutes lettres, même
+// convention que ci-dessus.
+export const CHECKLIST_TYPE_MATIN = "MATIN" as const;
+export const CHECKLIST_SOURCE_TYPE_FIXED_ITEM = "FIXED_ITEM" as const;
+
+/**
+ * Liste par défaut pré-remplie à la toute première consultation de "Ce
+ * matin" pour un utilisateur (Design Notes spec 2.2 : détectée par "aucun
+ * `FixedChecklistItem` de type MATIN pour cet utilisateur", jamais recréée
+ * ensuite -- y compris si l'utilisateur supprime tout).
+ */
+export const DEFAULT_MATIN_ITEMS = [
+  "Clés",
+  "Goûter",
+  "Carnet",
+  "Chargeur",
+] as const;
+
 /** Un objet par défaut d'une matière (`SubjectItem`), tel que chargé par data/checklist.ts. */
 export interface ChecklistSubjectItemInput {
   id: string;
@@ -81,5 +100,49 @@ export function deriveSacChecklist(
       label: item.label,
       checked: checkedBySourceId.get(item.id) ?? false,
     })),
+  }));
+}
+
+/** Un `FixedChecklistItem` (Matin ici), tel que chargé par data/checklist.ts. */
+export interface FixedChecklistItemInput {
+  id: string;
+  label: string;
+}
+
+/**
+ * Dérive une checklist fixe (Matin ici, Retour en Story 2.3) : liste plate
+ * (pas de groupement par matière, contrairement au sac -- spec 2.2, Never),
+ * croisée avec l'état coché existant, keyé par `sourceId` (l'`id` du
+ * `FixedChecklistItem`), jamais par libellé (AD-3), exactement le même
+ * mécanisme que `deriveSacChecklist`.
+ *
+ * Comportements couverts (I/O matrix spec 2.2) :
+ * - un item sans état coché existant est décoché par défaut (nouveau jour
+ *   scolaire : `checkedStates` vient d'une `date` différente, donc vide) ;
+ * - un item dont l'`id` a un état coché existant reflète cet état, même si
+ *   son libellé a changé depuis (édition Réglages) ;
+ * - un état coché dont le `sourceId` ne correspond à aucun item reçu ici
+ *   (item supprimé depuis) est simplement ignoré -- pas de purge active
+ *   requise (AD-3).
+ *
+ * Pure : ne décide ni du pré-remplissage des défauts (data/checklist.ts) ni
+ * de la date "aujourd'hui" (domain/school-day.ts) -- reçoit `items` et
+ * `checkedStates` déjà résolus par l'appelant.
+ */
+export function deriveFixedChecklist(
+  items: readonly FixedChecklistItemInput[],
+  checkedStates: readonly ChecklistItemStateInput[]
+): DerivedChecklistItem[] {
+  const checkedBySourceId = new Map<string, boolean>();
+  for (const state of checkedStates) {
+    if (state.sourceType === CHECKLIST_SOURCE_TYPE_FIXED_ITEM) {
+      checkedBySourceId.set(state.sourceId, state.checked);
+    }
+  }
+
+  return items.map((item) => ({
+    sourceId: item.id,
+    label: item.label,
+    checked: checkedBySourceId.get(item.id) ?? false,
   }));
 }

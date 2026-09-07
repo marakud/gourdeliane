@@ -22,11 +22,13 @@ model User {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
-  subjects            Subject[]
-  scheduleSlots       ScheduleSlot[]
-  noSchoolDays        NoSchoolDay[]
-  subjectItems        SubjectItem[]
-  checklistItemStates ChecklistItemState[]
+  subjects                    Subject[]
+  scheduleSlots               ScheduleSlot[]
+  noSchoolDays                NoSchoolDay[]
+  subjectItems                SubjectItem[]
+  checklistItemStates         ChecklistItemState[]
+  fixedChecklistItems         FixedChecklistItem[]
+  fixedChecklistDefaultsSeeds FixedChecklistDefaultsSeed[]
 }
 
 // Jour de la semaine d'un créneau récurrent. Pas d'alternance A/B (PRD
@@ -144,4 +146,41 @@ model ChecklistItemState {
   updatedAt     DateTime @updatedAt
 
   @@unique([userId, date, checklistType, sourceType, sourceId])
+}
+
+// Un item d'une checklist fixe (Matin ici, Retour en Story 2.3), liste plate
+// par utilisateur -- pas liée à une matière, contrairement à `SubjectItem`
+// (spec 2.2). Scopée par `checklistType` ("MATIN"/"RETOUR") écrit en toutes
+// lettres en `String`, même convention que `ChecklistItemState.checklistType`
+// (domain/checklist.ts). Éditer `label` ne touche jamais un
+// `ChecklistItemState` déjà coché pour cet item (AD-3) : celui-ci le
+// référence par `id`, jamais par libellé -- identique à `SubjectItem`.
+model FixedChecklistItem {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checklistType String
+  label         String
+  createdAt     DateTime @default(now())
+
+  @@index([userId, checklistType])
+}
+
+// Marqueur "les défauts ont déjà été pré-remplis une fois" pour un
+// utilisateur + `checklistType` -- distinct de `FixedChecklistItem` lui-même
+// (spec 2.2, Boundaries/I-O matrix : le pré-remplissage n'a lieu qu'à la
+// toute première consultation, jamais recréé si l'utilisateur a depuis tout
+// supprimé). Sans ce marqueur, "aucun FixedChecklistItem pour ce type" ne
+// permettrait pas de distinguer ces deux cas -- tous deux se traduisent par
+// zéro ligne dans `FixedChecklistItem`. Une ligne ici est écrite une seule
+// fois (à la création des défauts) et n'est jamais mise à jour ni supprimée,
+// y compris si l'utilisateur supprime ensuite tous ses `FixedChecklistItem`.
+model FixedChecklistDefaultsSeed {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  checklistType String
+  createdAt     DateTime @default(now())
+
+  @@unique([userId, checklistType])
 }

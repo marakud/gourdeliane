@@ -3,20 +3,26 @@ import { ensureSeedUser } from "@/data/user";
 import { getScheduleForUser } from "@/data/schedule";
 import {
   listChecklistItemStates,
+  listFixedChecklistItems,
   listSubjectItemsForSubjects,
 } from "@/data/checklist";
 import { dedupeSubjectsFromSlots, deriveDaySlots, type Weekday } from "@/domain/schedule";
 import {
+  getTodaySchoolDate,
   getTomorrowSchoolDate,
   schoolDateToIso,
   schoolDateToWeekday,
 } from "@/domain/school-day";
 import {
+  CHECKLIST_TYPE_MATIN,
   CHECKLIST_TYPE_SAC,
+  DEFAULT_MATIN_ITEMS,
+  deriveFixedChecklist,
   deriveSacChecklist,
   type ChecklistSubjectGroupInput,
 } from "@/domain/checklist";
 import { SacChecklist } from "@/components/checklist/sac-checklist";
+import { FixedChecklist } from "@/components/checklist/fixed-checklist";
 
 export default async function AccueilPage() {
   // Force le rendu dynamique à chaque requête (AGENTS.md -- modèle de cache
@@ -102,6 +108,28 @@ export default async function AccueilPage() {
     );
   }
 
+  // "Ce matin" (Story 2.2) : porte sur AUJOURD'HUI, pas demain (Boundaries
+  // spec 2.2) -- indépendant de l'EDT, toujours affiché. Le pré-remplissage
+  // des défauts à la première consultation est géré par
+  // data/checklist.ts::listFixedChecklistItems.
+  const todayDate = getTodaySchoolDate(now);
+  const todayIso = schoolDateToIso(todayDate);
+  const todayDateAsDate = new Date(`${todayIso}T00:00:00.000Z`);
+
+  const [matinItems, matinCheckedStates] = await Promise.all([
+    listFixedChecklistItems(user.id, CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS),
+    listChecklistItemStates(user.id, todayDateAsDate, CHECKLIST_TYPE_MATIN),
+  ]);
+
+  const matinChecklist = deriveFixedChecklist(
+    matinItems.map((item) => ({ id: item.id, label: item.label })),
+    matinCheckedStates.map((state) => ({
+      sourceType: state.sourceType,
+      sourceId: state.sourceId,
+      checked: state.checked,
+    }))
+  );
+
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-8">
       <div>
@@ -120,6 +148,12 @@ export default async function AccueilPage() {
           Pas cours demain, profite de ta soirée !
         </p>
       )}
+
+      <FixedChecklist
+        title="Ce matin"
+        items={matinChecklist}
+        dateIso={todayIso}
+      />
     </div>
   );
 }

@@ -43,8 +43,8 @@
   evidence: Blind-hunter review. Not required by any spec 2.1 acceptance criterion; low real-world impact for a single child managing their own short lists, but worth a `@@unique([subjectId, label])`-style guard if it ever causes visible confusion.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-1-voir-et-personnaliser-mon-sac-du-soir.md`
-  summary: Server Actions in actions/checklist.ts (and actions/schedule.ts before it) trust their input's TypeScript types at runtime with no `typeof` guard, and a thrown error from `revalidatePath` itself (called inside the same try block as the mutation) would be reported as a failed write even though the mutation already succeeded.
-  evidence: Edge-case-hunter review, same category as an already-deferred Story 1.2 finding (malformed direct POST to a Server Action bypassing client-side type safety). Very low real-world risk for a single-family, single-device-at-a-time app; `revalidatePath` throwing outside of its documented misuse cases (calling it outside a Server Action/Route Handler) hasn't been observed. Revisit only if this app gains a public-facing API surface or multi-device concurrent usage.
+  summary: Server Actions in actions/checklist.ts and actions/schedule.ts trust their input's TypeScript types at runtime with no `typeof` guard (a direct malformed POST could bypass client-side type safety).
+  evidence: Edge-case-hunter review, same category as an already-deferred Story 1.1 finding. Very low real-world risk for a single-family, single-device-at-a-time app. **Update (Story 2.2):** the sibling half of this finding -- `revalidatePath` throwing inside the same try block as the mutation, misreporting a successful write as failed -- turned out to be real and reproducible (confirmed while writing `actions/checklist.test.ts`: the DB row existed despite `{ ok: false }`), and has been fixed in both action files (`safeRevalidate`/try-catch around the revalidate call). Only the missing runtime type guard remains deferred here.
 
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-1-voir-et-personnaliser-mon-sac-du-soir.md`
   summary: `deleteSubjectItem` never removes the `ChecklistItemState` rows that reference the deleted item by `sourceId` (a loose string, not a foreign key) -- they accumulate as orphaned rows indefinitely instead of being purged.
@@ -53,3 +53,11 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-2-1-voir-et-personnaliser-mon-sac-du-soir.md`
   summary: No `aria-live` region announces the sac checklist's "done/total" progress count as items are toggled, so a screen-reader user gets no feedback that the count changed.
   evidence: Verification/edge-case reviews, same category as an already-deferred Story 1.3 finding for the EDT tabs. Nice-to-have accessibility polish, not required by any spec 2.1 acceptance criterion.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-2-cocher-mes-routines-fixes-du-matin.md`
+  summary: `FixedChecklistItem` default seeding via `createMany` gives all rows in one batch the identical `createdAt` timestamp (verified empirically -- all four default items got the exact same millisecond value), so `orderBy: { createdAt: "asc" }` has no guaranteed tie-break order among them.
+  evidence: Edge-case-hunter review, confirmed by direct testing against dev.db. SQLite happened to preserve insertion order on ties in that test, but this is an implementation detail, not a guarantee (and may differ on Postgres in production) -- the four default labels (Clés, Goûter, Carnet, Chargeur) could theoretically render in a different order than documented. Cosmetic only, not required by any spec 2.2 acceptance criterion; a `sortOrder` column would be the clean fix if the display order ever needs to be guaranteed.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-2-cocher-mes-routines-fixes-du-matin.md`
+  summary: If `DEFAULT_MATIN_ITEMS` is ever changed or extended in code, users already seeded (i.e. everyone after their first visit) will never receive the new/changed defaults -- `FixedChecklistDefaultsSeed` permanently suppresses re-seeding once written.
+  evidence: This is the deliberate, spec-mandated behavior (see this spec's Design Notes "choix assumé"), not a bug, but it's a real product constraint worth remembering: evolving the shipped default list has no automatic migration/backfill path today. Would need a deliberate one-off script if it's ever needed.

@@ -2,13 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
   CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
+  CHECKLIST_TYPE_MATIN,
   CHECKLIST_TYPE_SAC,
 } from "@/domain/checklist";
 import { ensureSeedUser } from "@/data/user";
 import {
+  createFixedChecklistItem as createFixedChecklistItemData,
   createSubjectItem as createSubjectItemData,
+  deleteFixedChecklistItem as deleteFixedChecklistItemData,
   deleteSubjectItem as deleteSubjectItemData,
+  updateFixedChecklistItem as updateFixedChecklistItemData,
   updateSubjectItem as updateSubjectItemData,
   upsertChecklistItemState,
 } from "@/data/checklist";
@@ -21,14 +26,29 @@ export type ActionResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: string };
 
+// `revalidatePath` exige un contexte de requête Next.js valide -- appelé en
+// dehors (ex. script, test direct de l'action) il lève "Invariant: static
+// generation store missing" (confirmé pendant la revue de la story 2.2).
+// Comme ces fonctions sont toujours appelées après une mutation déjà
+// réussie, une erreur ici ne doit jamais transformer un succès réel en
+// { ok: false } côté appelant -- on l'avale (avec un log) plutôt que de la
+// laisser remonter dans le même bloc try/catch que la mutation.
+function safeRevalidate(path: string) {
+  try {
+    revalidatePath(path);
+  } catch (error) {
+    console.error(`revalidatePath(${path}) failed:`, error);
+  }
+}
+
 function revalidateAccueil() {
   // app/(accueil)/page.tsx vit dans un groupe de routes -- son URL réelle
   // est "/", pas "/(accueil)".
-  revalidatePath("/");
+  safeRevalidate("/");
 }
 
 function revalidateReglages() {
-  revalidatePath("/reglages");
+  safeRevalidate("/reglages");
 }
 
 /**
@@ -49,7 +69,27 @@ export interface ToggleChecklistItemInput {
   date: string; // ISO "yyyy-MM-dd", jour pour lequel la checklist est préparée
   sourceId: string;
   checked: boolean;
+  // Généralisés (Story 2.2) pour que cette même action serve aussi bien le
+  // sac (Story 2.1) que Matin (cette story) et Retour (Story 2.3) --
+  // défauts sur les valeurs de Story 2.1 pour ne rien casser côté
+  // SacChecklist, qui ne les transmet pas explicitement.
+  checklistType?: string;
+  sourceType?: string;
 }
+
+// Contrairement à `checklistType`/`sourceType` sur `ChecklistItemState`
+// (String en base par choix, cf. domain/checklist.ts), une Server Action est
+// un point d'entrée réseau : un appel direct (hors UI) pourrait passer
+// n'importe quelle chaîne. Cette liste blanche évite d'écrire des lignes
+// avec un type inconnu qu'aucune vue ne saura jamais lire.
+const KNOWN_CHECKLIST_TYPES = new Set<string>([
+  CHECKLIST_TYPE_SAC,
+  CHECKLIST_TYPE_MATIN,
+]);
+const KNOWN_SOURCE_TYPES = new Set<string>([
+  CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
+  CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+]);
 
 export async function toggleChecklistItem(
   input: ToggleChecklistItemInput
@@ -61,14 +101,20 @@ export async function toggleChecklistItem(
   if (input.sourceId.trim().length === 0) {
     return { ok: false, error: "Objet invalide." };
   }
+  if (input.checklistType && !KNOWN_CHECKLIST_TYPES.has(input.checklistType)) {
+    return { ok: false, error: "Type de checklist invalide." };
+  }
+  if (input.sourceType && !KNOWN_SOURCE_TYPES.has(input.sourceType)) {
+    return { ok: false, error: "Type d'objet invalide." };
+  }
 
   try {
     const user = await ensureSeedUser();
     await upsertChecklistItemState({
       userId: user.id,
       date,
-      checklistType: CHECKLIST_TYPE_SAC,
-      sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
+      checklistType: input.checklistType ?? CHECKLIST_TYPE_SAC,
+      sourceType: input.sourceType ?? CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
       sourceId: input.sourceId,
       checked: input.checked,
     });
@@ -145,4 +191,90 @@ export async function deleteSubjectItem(
     console.error("deleteSubjectItem failed:", error);
     return { ok: false, error: "Impossible de supprimer l'objet. Réessaie." };
   }
+}
+
+// Story 2.2 -- gestion des items de "Ce matin" depuis Réglages. Le
+// `checklistType` reste "MATIN" en dur ici (pas transmis par l'appelant) :
+// ce fichier est l'unique point d'entrée mutation, et Retour (Story 2.3)
+// ajoutera ses propres actions dédiées plutôt que de paramétrer celles-ci --
+// même choix que la génération séparée SubjectItem vs FixedChecklistItem.
+
+export interface FixedChecklistItemFormInput {
+  label: string;
+}
+
+export async function createFixedChecklistItem(
+  input: FixedChecklistItemFormInput
+): Promise<ActionResult<{ id: string }>> {
+  const label = input.label.trim();
+  if (label.length === 0) {
+    return { ok: false, error: "Le nom de l'item est requis." };
+  }
+
+  try {
+    const user = await ensureSeedUser();
+    const item = await createFixedChecklistItemData(
+      user.id,
+      CHECKLIST_TYPE_MATIN,
+      label
+    );
+    revalidateReglages();
+    revalidateAccueil();
+    return { ok: true, data: { id: item.id } };
+  } catch (error) {
+    console.error("createFixedChecklistItem failed:", error);
+    return { ok: false, error: "Impossible d'ajouter l'item. Réessaie." };
+  }
+}
+
+export async function updateFixedChecklistItem(
+  id: string,
+  label: string
+): Promise<ActionResult<{ id: string }>> {
+  const trimmed = label.trim();
+  if (trimmed.length === 0) {
+    return { ok: false, error: "Le nom de l'item est requis." };
+  }
+
+  try {
+    const user = await ensureSeedUser();
+    const item = await updateFixedChecklistItemData(id, user.id, trimmed);
+    revalidateReglages();
+    revalidateAccueil();
+    return { ok: true, data: { id: item.id } };
+  } catch (error) {
+    console.error("updateFixedChecklistItem failed:", error);
+    return { ok: false, error: "Impossible de modifier l'item. Réessaie." };
+  }
+}
+
+export async function deleteFixedChecklistItem(
+  id: string
+): Promise<ActionResult<null>> {
+  try {
+    const user = await ensureSeedUser();
+    await deleteFixedChecklistItemData(id, user.id);
+    revalidateReglages();
+    revalidateAccueil();
+    return { ok: true, data: null };
+  } catch (error) {
+    console.error("deleteFixedChecklistItem failed:", error);
+    return { ok: false, error: "Impossible de supprimer l'item. Réessaie." };
+  }
+}
+
+/** Coche/décoche un item de "Ce matin" -- wrapper de `toggleChecklistItem`
+ * avec `checklistType`/`sourceType` fixés à MATIN/FIXED_ITEM, pour que
+ * `components/checklist/fixed-checklist.tsx` n'ait pas à connaître ces
+ * constantes de domaine (même niveau d'abstraction que `SacChecklist`, qui
+ * appelle `toggleChecklistItem` directement car SAC/SUBJECT_ITEM en sont les
+ * valeurs par défaut). */
+export async function toggleMatinChecklistItem(
+  input: Omit<ToggleChecklistItemInput, "checklistType" | "sourceType">
+): Promise<ActionResult<null>> {
+  return toggleChecklistItem({
+    ...input,
+    checklistType: CHECKLIST_TYPE_MATIN,
+    sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+  });
 }

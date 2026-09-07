@@ -1,7 +1,9 @@
 import { connection } from "next/server";
 import { ensureSeedUser } from "@/data/user";
-import { listSubjectsWithItems } from "@/data/checklist";
+import { listFixedChecklistItems, listSubjectsWithItems } from "@/data/checklist";
+import { CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS } from "@/domain/checklist";
 import { SubjectItemsManager } from "@/components/checklist/subject-items-manager";
+import { FixedItemsManager } from "@/components/checklist/fixed-items-manager";
 
 export default async function ReglagesPage() {
   // Force le rendu dynamique à chaque requête (AGENTS.md -- modèle de cache
@@ -11,7 +13,10 @@ export default async function ReglagesPage() {
   await connection();
 
   const user = await ensureSeedUser();
-  const subjects = await listSubjectsWithItems(user.id);
+  const [subjects, matinItems] = await Promise.all([
+    listSubjectsWithItems(user.id),
+    listFixedChecklistItems(user.id, CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS),
+  ]);
 
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-8">
@@ -36,6 +41,11 @@ export default async function ReglagesPage() {
             label: item.label,
           })),
         }))}
+      />
+
+      <FixedItemsManager
+        title="Ce matin"
+        items={matinItems.map((item) => ({ id: item.id, label: item.label }))}
       />
     </div>
   );

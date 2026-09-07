@@ -28,8 +28,18 @@ export interface SlotFormInput {
   subjectName: string;
 }
 
+// `revalidatePath` exige un contexte de requête Next.js valide -- appelé en
+// dehors (ex. script, test direct de l'action) il lève "Invariant: static
+// generation store missing" (confirmé pendant la revue de la story 2.2, même
+// fonction dupliquée dans actions/checklist.ts). Toujours appelée après une
+// mutation déjà réussie : une erreur ici ne doit jamais transformer un
+// succès réel en { ok: false } côté appelant.
 function revalidateEdt() {
-  revalidatePath("/edt");
+  try {
+    revalidatePath("/edt");
+  } catch (error) {
+    console.error("revalidatePath(/edt) failed:", error);
+  }
 }
 
 export async function createSlot(
