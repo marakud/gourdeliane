@@ -1,0 +1,150 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { validateSlot, type Weekday } from "@/domain/schedule";
+import { ensureSeedUser } from "@/data/user";
+import {
+  createScheduleSlot,
+  deleteScheduleSlot,
+  setNoSchoolDay,
+  unsetNoSchoolDay,
+  updateScheduleSlot,
+} from "@/data/schedule";
+
+// Toute mutation de l'EDT passe par ce fichier -- seule frontière de
+// mutation (AD-1). Chaque action rappelle domain/schedule.ts pour toute
+// règle de validation avant d'écrire via data/schedule.ts, et retourne un
+// résultat typé { ok: true, data } | { ok: false, error } -- jamais
+// d'exception non gérée remontée à l'UI (ARCHITECTURE-SPINE.md).
+
+export type ActionResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: string };
+
+export interface SlotFormInput {
+  weekday: string;
+  startTime: string;
+  endTime: string;
+  subjectName: string;
+}
+
+function revalidateEdt() {
+  revalidatePath("/edt");
+}
+
+export async function createSlot(
+  input: SlotFormInput
+): Promise<ActionResult<{ id: string }>> {
+  const validation = validateSlot(input);
+  if (!validation.valid) {
+    return { ok: false, error: validation.error };
+  }
+
+  try {
+    const user = await ensureSeedUser();
+    const slot = await createScheduleSlot({
+      userId: user.id,
+      weekday: input.weekday as Weekday,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      subjectName: input.subjectName.trim(),
+    });
+    revalidateEdt();
+    return { ok: true, data: { id: slot.id } };
+  } catch (error) {
+    console.error("createSlot failed:", error);
+    return {
+      ok: false,
+      error: "Impossible d'enregistrer le créneau. Réessaie.",
+    };
+  }
+}
+
+export async function updateSlot(
+  id: string,
+  input: SlotFormInput
+): Promise<ActionResult<{ id: string }>> {
+  const validation = validateSlot(input);
+  if (!validation.valid) {
+    return { ok: false, error: validation.error };
+  }
+
+  try {
+    const user = await ensureSeedUser();
+    const slot = await updateScheduleSlot({
+      id,
+      userId: user.id,
+      weekday: input.weekday as Weekday,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      subjectName: input.subjectName.trim(),
+    });
+    revalidateEdt();
+    return { ok: true, data: { id: slot.id } };
+  } catch (error) {
+    console.error("updateSlot failed:", error);
+    return {
+      ok: false,
+      error: "Impossible de modifier le créneau. Réessaie.",
+    };
+  }
+}
+
+export async function deleteSlot(id: string): Promise<ActionResult<null>> {
+  try {
+    const user = await ensureSeedUser();
+    await deleteScheduleSlot(id, user.id);
+    revalidateEdt();
+    return { ok: true, data: null };
+  } catch (error) {
+    console.error("deleteSlot failed:", error);
+    return {
+      ok: false,
+      error: "Impossible de supprimer le créneau. Réessaie.",
+    };
+  }
+}
+
+export async function markNoSchoolDay(
+  date: string
+): Promise<ActionResult<null>> {
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) {
+    return { ok: false, error: "Date invalide." };
+  }
+
+  try {
+    const user = await ensureSeedUser();
+    await setNoSchoolDay(user.id, parsed);
+    revalidateEdt();
+    return { ok: true, data: null };
+  } catch (error) {
+    console.error("markNoSchoolDay failed:", error);
+    return {
+      ok: false,
+      error: "Impossible de marquer ce jour comme sans cours. Réessaie.",
+    };
+  }
+}
+
+export async function unmarkNoSchoolDay(
+  date: string
+): Promise<ActionResult<null>> {
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) {
+    return { ok: false, error: "Date invalide." };
+  }
+
+  try {
+    const user = await ensureSeedUser();
+    await unsetNoSchoolDay(user.id, parsed);
+    revalidateEdt();
+    return { ok: true, data: null };
+  } catch (error) {
+    console.error("unmarkNoSchoolDay failed:", error);
+    return {
+      ok: false,
+      error: "Impossible de démarquer ce jour. Réessaie.",
+    };
+  }
+}

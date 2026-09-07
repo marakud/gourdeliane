@@ -11,6 +11,7 @@
     "build:vercel": "prisma generate --schema=prisma/production/schema.prisma && prisma migrate deploy --schema=prisma/production/schema.prisma && tsx prisma/seed.ts && next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
@@ -46,6 +47,7 @@
     "shadcn": "^4.20.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.13",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

@@ -1,11 +1,9 @@
-// CartableFlow -- schéma Prisma initial (Story 1.1)
-// Un seul modèle : User (id uniquement, pas de champ auth -- pas d'écran de connexion).
+// CartableFlow -- schéma Prisma (Story 1.1 : User -- Story 1.2 : EDT)
 // Ce fichier est le schéma de DEV LOCAL (provider "sqlite"). Prisma n'autorise pas de
 // provider dynamique via env() sur un datasource : le pendant production (Postgres /
 // Supabase) vit dans prisma/production/schema.prisma (dossier de migrations séparé,
 // voir README) et doit rester synchronisé avec celui-ci (seul le "provider" du
 // datasource diffère). Voir README / .env.example.
-// Les modèles des epics suivants (Subject, ScheduleSlot, ...) arrivent en Story 1.2+.
 
 generator client {
   provider = "prisma-client-js"
@@ -21,4 +19,80 @@ datasource db {
 model User {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
+
+  subjects      Subject[]
+  scheduleSlots ScheduleSlot[]
+  noSchoolDays  NoSchoolDay[]
+}
+
+// Jour de la semaine d'un créneau récurrent. Pas d'alternance A/B (PRD
+// confirmé, Deferred par l'architecture) : un créneau vaut pour toutes les
+// semaines, identifié uniquement par ce jour + horaire, jamais par une date.
+enum Weekday {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+// Une matière. `colorIndex` est assigné une fois pour toutes à la création
+// (domain/schedule.ts::assignNextColorIndex) et n'est jamais recalculé,
+// même si d'autres matières sont supprimées ensuite (AD-6). Palette
+// subject-1..8 de DESIGN.md, cyclique au-delà de 8 matières.
+model Subject {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  colorIndex Int
+  createdAt  DateTime @default(now())
+
+  scheduleSlots ScheduleSlot[]
+
+  // Une matière est réutilisée par son nom : deux créneaux sur "Maths"
+  // partagent la même Subject, jamais une doublée.
+  @@unique([userId, name])
+}
+
+// Un créneau hebdomadaire récurrent (jour + horaire + matière), identique
+// chaque semaine -- pas de date, pas d'alternance A/B. Horaires stockés en
+// String "HH:mm" (tri lexicographique correct dans ce format) : il n'y a pas
+// de notion de date pour un créneau récurrent (voir Design Notes spec 1.2).
+//
+// Décision d'implémentation (I/O matrix spec 1.2, "Suppression d'une matière
+// avec créneaux") : suppression en cascade -- supprimer une Subject supprime
+// ses ScheduleSlot. Aucune UI de suppression directe de matière n'existe en
+// Story 1.2 (seule la création à la volée depuis le formulaire de créneau
+// est exposée) ; ce choix garde l'intégrité référentielle simple pour le
+// jour où une telle UI arrivera (Réglages, epics suivants).
+model ScheduleSlot {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  weekday   Weekday
+  startTime String
+  endTime   String
+  createdAt DateTime @default(now())
+
+  @@index([userId, weekday])
+}
+
+// Un jour marqué "sans cours" par date précise (ex. jour férié, vacances),
+// mémorisé indépendamment des créneaux hebdomadaires récurrents -- jamais
+// dérivé (voir Design Notes spec 1.2). `date` est normalisée à minuit UTC
+// par la couche data/ avant écriture/lecture ; clé unique (userId, date)
+// pour rendre le marquage idempotent.
+model NoSchoolDay {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([userId, date])
 }
