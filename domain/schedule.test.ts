@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   assignNextColorIndex,
+  dedupeSubjectsFromSlots,
   deriveDaySlots,
   validateSlot,
   type DaySlot,
+  type SubjectRef,
 } from "./schedule";
 
 describe("assignNextColorIndex (AD-6)", () => {
@@ -112,5 +114,35 @@ describe("deriveDaySlots (I/O matrix spec 1.3)", () => {
       new Set(["2026-09-08"])
     );
     expect(result.map((s) => s.id)).toEqual(["2", "1"]);
+  });
+});
+
+describe("dedupeSubjectsFromSlots (Story 2.1 -- sac du soir)", () => {
+  const maths: SubjectRef = { id: "s1", name: "Maths", colorIndex: 1 };
+  const eps: SubjectRef = { id: "s2", name: "EPS", colorIndex: 2 };
+  const subjects: SubjectRef[] = [maths, eps];
+
+  it("dedupes a subject appearing in multiple slots the same day, keeping first-seen order", () => {
+    const slots = [
+      { subject: { name: "Maths" } },
+      { subject: { name: "EPS" } },
+      { subject: { name: "Maths" } },
+    ];
+
+    const result = dedupeSubjectsFromSlots(slots, subjects);
+
+    expect(result).toEqual([maths, eps]);
+  });
+
+  it("returns an empty list for no slots", () => {
+    expect(dedupeSubjectsFromSlots([], subjects)).toEqual([]);
+  });
+
+  it("silently skips a slot whose subject name isn't found in subjects", () => {
+    const slots = [{ subject: { name: "Musique" } }, { subject: { name: "Maths" } }];
+
+    const result = dedupeSubjectsFromSlots(slots, subjects);
+
+    expect(result).toEqual([maths]);
   });
 });

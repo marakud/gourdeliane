@@ -139,3 +139,38 @@ export function deriveDaySlots(
     .filter((slot) => slot.weekday === weekday)
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
+
+export interface SubjectRef {
+  id: string;
+  name: string;
+  colorIndex: number;
+}
+
+/**
+ * Déduit la liste ordonnée (sans doublon) des matières présentes dans une
+ * liste de créneaux (ex. les créneaux de demain, Story 2.1 -- une matière
+ * peut avoir plusieurs créneaux le même jour). Garde l'ordre du premier
+ * créneau où chaque matière apparaît. Résout chaque créneau (qui ne porte que
+ * le nom de la matière) vers l'enregistrement `Subject` complet (id inclus)
+ * via `subjects` -- une matière du créneau introuvable dans `subjects` est
+ * silencieusement ignorée plutôt que de produire une entrée invalide.
+ */
+export function dedupeSubjectsFromSlots<S extends { subject: { name: string } }>(
+  slots: readonly S[],
+  subjects: readonly SubjectRef[]
+): SubjectRef[] {
+  const subjectByName = new Map(subjects.map((subject) => [subject.name, subject]));
+  const seenNames = new Set<string>();
+  const result: SubjectRef[] = [];
+
+  for (const slot of slots) {
+    if (seenNames.has(slot.subject.name)) continue;
+    seenNames.add(slot.subject.name);
+    const subject = subjectByName.get(slot.subject.name);
+    if (subject) {
+      result.push(subject);
+    }
+  }
+
+  return result;
+}

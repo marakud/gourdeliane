@@ -37,3 +37,19 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-1-3-voir-ma-journee-et-mon-lendemain.md`
   summary: `parisDateParts` (domain/school-day.ts) has no guard against `Intl.DateTimeFormat` ever returning parts that don't parse to valid numbers (would silently produce NaN dates).
   evidence: Edge-case-hunter and blind-hunter both flagged it. Practically unreachable with a hardcoded, valid IANA zone name ("Europe/Paris") on any real JS runtime (Vercel/Node ship full ICU data) -- not worth a runtime guard now, but a cheap one to add if this function is ever touched again.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-1-voir-et-personnaliser-mon-sac-du-soir.md`
+  summary: No uniqueness constraint or dedup on `SubjectItem.label` within a subject -- a user can create two items with the identical label under the same matière.
+  evidence: Blind-hunter review. Not required by any spec 2.1 acceptance criterion; low real-world impact for a single child managing their own short lists, but worth a `@@unique([subjectId, label])`-style guard if it ever causes visible confusion.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-1-voir-et-personnaliser-mon-sac-du-soir.md`
+  summary: Server Actions in actions/checklist.ts (and actions/schedule.ts before it) trust their input's TypeScript types at runtime with no `typeof` guard, and a thrown error from `revalidatePath` itself (called inside the same try block as the mutation) would be reported as a failed write even though the mutation already succeeded.
+  evidence: Edge-case-hunter review, same category as an already-deferred Story 1.2 finding (malformed direct POST to a Server Action bypassing client-side type safety). Very low real-world risk for a single-family, single-device-at-a-time app; `revalidatePath` throwing outside of its documented misuse cases (calling it outside a Server Action/Route Handler) hasn't been observed. Revisit only if this app gains a public-facing API surface or multi-device concurrent usage.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-1-voir-et-personnaliser-mon-sac-du-soir.md`
+  summary: `deleteSubjectItem` never removes the `ChecklistItemState` rows that reference the deleted item by `sourceId` (a loose string, not a foreign key) -- they accumulate as orphaned rows indefinitely instead of being purged.
+  evidence: Blind-hunter review. This is the deliberate AD-3 behavior ("simply not rendered again, no active purge required") rather than an oversight, but for a long-lived family install the orphaned-row count will grow unbounded over years of use. Not a correctness bug (deriveSacChecklist already ignores them), just a storage-growth note worth a periodic cleanup job if it's ever worth the effort.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-2-1-voir-et-personnaliser-mon-sac-du-soir.md`
+  summary: No `aria-live` region announces the sac checklist's "done/total" progress count as items are toggled, so a screen-reader user gets no feedback that the count changed.
+  evidence: Verification/edge-case reviews, same category as an already-deferred Story 1.3 finding for the EDT tabs. Nice-to-have accessibility polish, not required by any spec 2.1 acceptance criterion.

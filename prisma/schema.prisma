@@ -20,9 +20,11 @@ model User {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
-  subjects      Subject[]
-  scheduleSlots ScheduleSlot[]
-  noSchoolDays  NoSchoolDay[]
+  subjects            Subject[]
+  scheduleSlots       ScheduleSlot[]
+  noSchoolDays        NoSchoolDay[]
+  subjectItems        SubjectItem[]
+  checklistItemStates ChecklistItemState[]
 }
 
 // Jour de la semaine d'un créneau récurrent. Pas d'alternance A/B (PRD
@@ -51,6 +53,7 @@ model Subject {
   createdAt  DateTime @default(now())
 
   scheduleSlots ScheduleSlot[]
+  items         SubjectItem[]
 
   // Une matière est réutilisée par son nom : deux créneaux sur "Maths"
   // partagent la même Subject, jamais une doublée.
@@ -95,4 +98,48 @@ model NoSchoolDay {
   createdAt DateTime @default(now())
 
   @@unique([userId, date])
+}
+
+// Un objet par défaut associé à une matière (ex. "EPS" -> "Tenue de sport",
+// FR-4, Story 2.1). Géré depuis Réglages ; éditer/supprimer un objet
+// s'applique à toutes les occurrences futures de cette matière -- aucune
+// checklist n'est jamais stockée par jour (AD-2, domain/checklist.ts).
+// Modifier `label` ne touche jamais un `ChecklistItemState` déjà coché pour
+// cet objet (AD-3) : celui-ci le référence par `id`, jamais par libellé.
+model SubjectItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  label     String
+  createdAt DateTime @default(now())
+
+  @@index([userId, subjectId])
+}
+
+// État coché d'un item de checklist, keyé par identité stable -- jamais par
+// libellé (AD-3). `date` est le jour POUR lequel la checklist est préparée
+// (demain pour le sac), pas le jour de consultation (Design Notes spec 2.1).
+// `checklistType` ("SAC" pour cette story) et `sourceType` ("SUBJECT_ITEM"
+// pour cette story) sont écrits en toutes lettres en `String` plutôt qu'en
+// enum Prisma : les stories suivantes (Matin/Retour/Révisions, Devoirs)
+// réutiliseront ce même modèle avec d'autres valeurs plutôt que d'introduire
+// une nouvelle table -- voir domain/checklist.ts pour les constantes
+// applicatives correspondantes. Aucune tâche planifiée ne réinitialise cette
+// table : le "reset quotidien" du sac vient du fait que `date` change d'un
+// jour à l'autre, jamais d'un cron (cf. Never de la spec 2.1).
+model ChecklistItemState {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date          DateTime
+  checklistType String
+  sourceType    String
+  sourceId      String
+  checked       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([userId, date, checklistType, sourceType, sourceId])
 }
