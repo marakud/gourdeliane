@@ -29,6 +29,7 @@ model User {
   checklistItemStates         ChecklistItemState[]
   fixedChecklistItems         FixedChecklistItem[]
   fixedChecklistDefaultsSeeds FixedChecklistDefaultsSeed[]
+  devoirs                     Devoir[]
 }
 
 // Jour de la semaine d'un créneau récurrent. Pas d'alternance A/B (PRD
@@ -58,6 +59,7 @@ model Subject {
 
   scheduleSlots ScheduleSlot[]
   items         SubjectItem[]
+  devoirs       Devoir[]
 
   // Une matière est réutilisée par son nom : deux créneaux sur "Maths"
   // partagent la même Subject, jamais une doublée.
@@ -183,4 +185,32 @@ model FixedChecklistDefaultsSeed {
   createdAt     DateTime @default(now())
 
   @@unique([userId, checklistType])
+}
+
+// Un devoir donné en classe (Story 2.4) : matière + description seules
+// obligatoires ; "à rendre" et échéance restent optionnels pour ne pas
+// freiner une saisie rapide entre deux cours (Boundaries spec 2.4).
+// `echeance` n'est utilisée par aucune logique de cette story -- elle est
+// posée dès maintenant car Story 2.5 (lien au sac du lendemain) la consomme
+// sans nouvelle migration.
+//
+// AD-7 -- `done` ne suit PAS le cycle de réinitialisation quotidien de
+// `ChecklistItemState` (AD-3) : il ne change que par tap explicite de
+// l'enfant (actions/homework.ts::toggleDevoirDoneAction), jamais par une
+// tâche planifiée. Un devoir fait n'est simplement plus rendu dans "Devoirs
+// à faire" (domain/homework.ts::filterDevoirsAFaire) -- il n'est jamais
+// supprimé de cette table, même après plusieurs jours (Never de la spec).
+model Devoir {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId   String
+  subject     Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  description String
+  aRendre     Boolean   @default(false)
+  echeance    DateTime?
+  done        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, done])
 }

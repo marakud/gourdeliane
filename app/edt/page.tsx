@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { ensureSeedUser } from "@/data/user";
 import { getScheduleForUser } from "@/data/schedule";
 import { EdtViewTabs } from "@/components/schedule/edt-view-tabs";
+import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
 import { deriveDaySlots, type Weekday } from "@/domain/schedule";
 import {
   getTodaySchoolDate,
@@ -90,6 +91,14 @@ export default async function EdtPage() {
           subjectNames,
           noSchoolDays: noSchoolDayDates,
         }}
+      />
+
+      <AddHomeworkFab
+        subjects={subjects.map((subject) => ({
+          id: subject.id,
+          name: subject.name,
+          colorIndex: subject.colorIndex,
+        }))}
       />
     </div>
   );

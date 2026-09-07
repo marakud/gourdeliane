@@ -6,6 +6,7 @@ import {
   listFixedChecklistItems,
   listSubjectItemsForSubjects,
 } from "@/data/checklist";
+import { listDevoirs } from "@/data/homework";
 import { dedupeSubjectsFromSlots, deriveDaySlots, type Weekday } from "@/domain/schedule";
 import {
   getTodaySchoolDate,
@@ -23,12 +24,16 @@ import {
   deriveSacChecklist,
   type ChecklistSubjectGroupInput,
 } from "@/domain/checklist";
+import { filterDevoirsAFaire } from "@/domain/homework";
 import {
   toggleMatinChecklistItem,
   toggleRetourChecklistItem,
 } from "@/actions/checklist";
+import { toggleDevoirDoneAction } from "@/actions/homework";
 import { SacChecklist } from "@/components/checklist/sac-checklist";
 import { FixedChecklist } from "@/components/checklist/fixed-checklist";
+import { DevoirsList } from "@/components/homework/devoirs-list";
+import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
 
 export default async function AccueilPage() {
   // Force le rendu dynamique à chaque requête (AGENTS.md -- modèle de cache
@@ -155,6 +160,27 @@ export default async function AccueilPage() {
     }))
   );
 
+  // "Devoirs à faire" (Story 2.4) : bloc indépendant de l'EDT, toujours
+  // affiché (y compris vide -- contrairement au sac). `listDevoirs` renvoie
+  // faits + à faire, `filterDevoirsAFaire` (domain/homework.ts, AD-7) exclut
+  // les faits sans jamais les toucher en base.
+  const devoirs = await listDevoirs(user.id);
+  const devoirsAFaire = filterDevoirsAFaire(devoirs).map((devoir) => ({
+    id: devoir.id,
+    description: devoir.description,
+    subject: {
+      id: devoir.subject.id,
+      name: devoir.subject.name,
+      colorIndex: devoir.subject.colorIndex,
+    },
+  }));
+
+  const homeworkSubjects = subjects.map((subject) => ({
+    id: subject.id,
+    name: subject.name,
+    colorIndex: subject.colorIndex,
+  }));
+
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-8">
       <div>
@@ -189,6 +215,10 @@ export default async function AccueilPage() {
         headingId="retour-heading"
         onToggle={toggleRetourChecklistItem}
       />
+
+      <DevoirsList devoirs={devoirsAFaire} onComplete={toggleDevoirDoneAction} />
+
+      <AddHomeworkFab subjects={homeworkSubjects} />
     </div>
   );
 }

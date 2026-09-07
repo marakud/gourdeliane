@@ -42,6 +42,20 @@ function revalidateEdt() {
   }
 }
 
+// Créer/modifier un créneau peut faire naître une nouvelle Subject
+// (findOrCreateSubject, data/schedule.ts) -- Accueil (route "/", groupe
+// (accueil)) lit aussi la liste des matières (Sac, et depuis la Story 2.4 le
+// sélecteur du FAB "Ajouter un devoir"), donc sans ceci une matière tout
+// juste créée depuis l'EDT resterait absente d'Accueil jusqu'à une autre
+// revalidation.
+function revalidateAccueil() {
+  try {
+    revalidatePath("/");
+  } catch (error) {
+    console.error("revalidatePath(/) failed:", error);
+  }
+}
+
 export async function createSlot(
   input: SlotFormInput
 ): Promise<ActionResult<{ id: string }>> {
@@ -60,6 +74,7 @@ export async function createSlot(
       subjectName: input.subjectName.trim(),
     });
     revalidateEdt();
+    revalidateAccueil();
     return { ok: true, data: { id: slot.id } };
   } catch (error) {
     console.error("createSlot failed:", error);
@@ -90,6 +105,7 @@ export async function updateSlot(
       subjectName: input.subjectName.trim(),
     });
     revalidateEdt();
+    revalidateAccueil();
     return { ok: true, data: { id: slot.id } };
   } catch (error) {
     console.error("updateSlot failed:", error);
