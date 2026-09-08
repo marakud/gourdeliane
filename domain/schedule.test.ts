@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   assignNextColorIndex,
+  computeFreeGaps,
+  computeWeeklyFreeGaps,
   dedupeSubjectsFromSlots,
   deriveDaySlots,
   validateSlot,
@@ -144,5 +146,104 @@ describe("dedupeSubjectsFromSlots (Story 2.1 -- sac du soir)", () => {
     const result = dedupeSubjectsFromSlots(slots, subjects);
 
     expect(result).toEqual([maths]);
+  });
+});
+
+describe("computeFreeGaps (spec 2.4 amendment -- retour utilisateur : disponibilité EDT)", () => {
+  it("returns the full window when there are no slots", () => {
+    expect(computeFreeGaps([])).toEqual([{ start: "08:00", end: "22:00" }]);
+  });
+
+  it("splits into two gaps around a single slot", () => {
+    const result = computeFreeGaps([{ startTime: "10:00", endTime: "11:00" }]);
+    expect(result).toEqual([
+      { start: "08:00", end: "10:00" },
+      { start: "11:00", end: "22:00" },
+    ]);
+  });
+
+  it("handles multiple non-adjacent slots, sorted regardless of input order", () => {
+    const result = computeFreeGaps([
+      { startTime: "14:00", endTime: "15:00" },
+      { startTime: "08:00", endTime: "09:00" },
+    ]);
+    expect(result).toEqual([
+      { start: "09:00", end: "14:00" },
+      { start: "15:00", end: "22:00" },
+    ]);
+  });
+
+  it("produces no gap before a slot that starts exactly at the window start", () => {
+    const result = computeFreeGaps([{ startTime: "08:00", endTime: "09:00" }]);
+    expect(result).toEqual([{ start: "09:00", end: "22:00" }]);
+  });
+
+  it("produces no gap after a slot that ends exactly at the window end", () => {
+    const result = computeFreeGaps([{ startTime: "21:00", endTime: "22:00" }]);
+    expect(result).toEqual([{ start: "08:00", end: "21:00" }]);
+  });
+
+  it("returns no gaps when a single slot covers the entire window", () => {
+    expect(computeFreeGaps([{ startTime: "08:00", endTime: "22:00" }])).toEqual([]);
+  });
+
+  it("never produces a negative-width gap for overlapping slots", () => {
+    const result = computeFreeGaps([
+      { startTime: "09:00", endTime: "12:00" },
+      { startTime: "10:00", endTime: "11:00" },
+    ]);
+    expect(result).toEqual([
+      { start: "08:00", end: "09:00" },
+      { start: "12:00", end: "22:00" },
+    ]);
+  });
+
+  it("respects a custom window", () => {
+    const result = computeFreeGaps([], "07:00", "20:00");
+    expect(result).toEqual([{ start: "07:00", end: "20:00" }]);
+  });
+
+  it("clips a gap to windowEnd rather than extending past it for a slot starting after the window (bug fixed in review)", () => {
+    const result = computeFreeGaps([{ startTime: "23:00", endTime: "23:30" }]);
+    expect(result).toEqual([{ start: "08:00", end: "22:00" }]);
+  });
+
+  it("ignores a slot entirely before the window", () => {
+    const result = computeFreeGaps([{ startTime: "06:00", endTime: "07:00" }]);
+    expect(result).toEqual([{ start: "08:00", end: "22:00" }]);
+  });
+
+  it("clips a slot that straddles windowEnd to the window boundary", () => {
+    const result = computeFreeGaps([{ startTime: "21:00", endTime: "23:00" }]);
+    expect(result).toEqual([{ start: "08:00", end: "21:00" }]);
+  });
+
+  it("clips a slot that straddles windowStart to the window boundary", () => {
+    const result = computeFreeGaps([{ startTime: "06:00", endTime: "09:00" }]);
+    expect(result).toEqual([{ start: "09:00", end: "22:00" }]);
+  });
+});
+
+describe("computeWeeklyFreeGaps (spec 2.4 amendment -- lundi à dimanche)", () => {
+  it("computes independent gaps for each of the 7 weekdays", () => {
+    const result = computeWeeklyFreeGaps([
+      { weekday: "MONDAY", startTime: "08:00", endTime: "09:00" },
+      { weekday: "TUESDAY", startTime: "10:00", endTime: "11:00" },
+    ]);
+
+    expect(result.MONDAY).toEqual([{ start: "09:00", end: "22:00" }]);
+    expect(result.TUESDAY).toEqual([
+      { start: "08:00", end: "10:00" },
+      { start: "11:00", end: "22:00" },
+    ]);
+    expect(result.WEDNESDAY).toEqual([{ start: "08:00", end: "22:00" }]);
+    expect(result.SUNDAY).toEqual([{ start: "08:00", end: "22:00" }]);
+  });
+
+  it("returns the full window for every day when there are no slots at all", () => {
+    const result = computeWeeklyFreeGaps([]);
+    for (const day of ["MONDAY", "SATURDAY", "SUNDAY"] as const) {
+      expect(result[day]).toEqual([{ start: "08:00", end: "22:00" }]);
+    }
   });
 });

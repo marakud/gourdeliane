@@ -1,15 +1,17 @@
 import { prisma } from "./prisma";
+import type { Weekday } from "@/domain/schedule";
 
-// Story 2.4 (+ amendement retour utilisateur) -- accès aux données des
-// devoirs : création (avec rattachement optionnel à un créneau EDT), bascule
-// "fait" (bidirectionnelle), suppression, listing. Toute logique de
+// Story 2.4 (+ amendements retour utilisateur) -- accès aux données des
+// devoirs : création (avec placement optionnel dans un trou libre de l'EDT),
+// bascule "fait" (bidirectionnelle), suppression, listing. Toute logique de
 // dérivation vit dans domain/homework.ts, jamais ici.
 
 /**
- * Crée un devoir. `aRendre`/`echeance`/`scheduleSlotId` restent optionnels
- * (Boundaries spec 2.4 : seules matière + description sont obligatoires,
- * validées en amont par actions/homework.ts) -- `done` démarre toujours à
- * `false` (défaut du schéma), aucun devoir ne peut être créé déjà fait.
+ * Crée un devoir. `aRendre`/`echeance`/`plannedWeekday`/`plannedStartTime`
+ * restent optionnels (Boundaries spec 2.4 : seules matière + description
+ * sont obligatoires, validées en amont par actions/homework.ts) -- `done`
+ * démarre toujours à `false` (défaut du schéma), aucun devoir ne peut être
+ * créé déjà fait.
  */
 export async function createDevoir(
   userId: string,
@@ -17,11 +19,20 @@ export async function createDevoir(
   description: string,
   aRendre: boolean = false,
   echeance: Date | null = null,
-  scheduleSlotId: string | null = null
+  plannedWeekday: Weekday | null = null,
+  plannedStartTime: string | null = null
 ) {
   return prisma.devoir.create({
-    data: { userId, subjectId, description, aRendre, echeance, scheduleSlotId },
-    include: { subject: true, scheduleSlot: true },
+    data: {
+      userId,
+      subjectId,
+      description,
+      aRendre,
+      echeance,
+      plannedWeekday,
+      plannedStartTime,
+    },
+    include: { subject: true },
   });
 }
 
@@ -58,14 +69,14 @@ export async function deleteDevoir(id: string, userId: string) {
 /**
  * Liste tous les devoirs d'un utilisateur (faits et à faire -- les deux
  * restent affichés dans "Devoirs", Boundaries spec 2.4 amendée), avec leur
- * matière (pastille de couleur, SubjectTag) et leur créneau EDT rattaché le
- * cas échéant. `orderBy: createdAt asc` fixe l'ordre "reçu", préservé tel
- * quel par l'appelant (pas de tri par urgence, Boundaries spec 2.4).
+ * matière (pastille de couleur, SubjectTag). `orderBy: createdAt asc` fixe
+ * l'ordre "reçu", préservé tel quel par l'appelant (pas de tri par urgence,
+ * Boundaries spec 2.4).
  */
 export async function listDevoirs(userId: string) {
   return prisma.devoir.findMany({
     where: { userId },
-    include: { subject: true, scheduleSlot: true },
+    include: { subject: true },
     orderBy: { createdAt: "asc" },
   });
 }

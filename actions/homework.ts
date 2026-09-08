@@ -3,6 +3,12 @@
 import { revalidatePath } from "next/cache";
 import { ensureSeedUser } from "@/data/user";
 import { createDevoir, deleteDevoir, toggleDevoirDone } from "@/data/homework";
+import {
+  DEFAULT_FREE_WINDOW_END,
+  DEFAULT_FREE_WINDOW_START,
+  isWeekday,
+  TIME_PATTERN,
+} from "@/domain/schedule";
 
 // Toute mutation des devoirs passe par ce fichier (AD-1). Chaque action
 // rappelle domain/homework.ts pour toute règle métier avant d'écrire via
@@ -39,9 +45,10 @@ function revalidateAccueil() {
 }
 
 function revalidateEdt() {
-  // Un devoir peut être rattaché à un créneau EDT (scheduleSlotId, retour
-  // utilisateur Story 2.4) et s'y afficher -- toute mutation doit donc aussi
-  // revalider "/edt", pas seulement Accueil.
+  // Un devoir peut être programmé dans un trou libre de l'EDT
+  // (plannedWeekday/plannedStartTime, retour utilisateur Story 2.4) et s'y
+  // afficher -- toute mutation doit donc aussi revalider "/edt", pas
+  // seulement Accueil.
   safeRevalidate("/edt");
 }
 
@@ -51,9 +58,11 @@ export interface DevoirFormInput {
   // Optionnels (Boundaries spec 2.4) : aucune validation ne les rend requis.
   aRendre?: boolean;
   echeance?: string; // ISO "yyyy-MM-dd", saisie via <input type="date">
-  // Rattachement optionnel à un créneau EDT existant (retour utilisateur
-  // Story 2.4, "programmer le devoir dans l'EDT").
-  scheduleSlotId?: string;
+  // Placement optionnel dans un trou libre de l'EDT (retour utilisateur
+  // Story 2.4, "programmer le devoir dans l'EDT") -- les deux ensemble ou
+  // aucun des deux, jamais l'un sans l'autre.
+  plannedWeekday?: string;
+  plannedStartTime?: string; // "HH:mm"
 }
 
 /**
@@ -89,8 +98,12 @@ function parseEcheance(
 /**
  * Crée un devoir depuis le FAB (Accueil ou EDT). Matière + description sont
  * les seuls champs obligatoires (Boundaries spec 2.4) -- "à rendre",
- * échéance et créneau EDT restent optionnels, aucune validation ne les rend
- * requis.
+ * échéance et placement EDT restent optionnels, aucune validation ne les
+ * rend requis. Le placement (jour+heure) n'est pas revérifié ici comme
+ * "réellement dans un trou libre" (pas de requête sur `ScheduleSlot`) --
+ * le sélecteur (`FreeTimePicker`, `domain/schedule.ts::computeWeeklyFreeGaps`)
+ * ne propose déjà que des trous libres au moment de l'affichage. Seuls le
+ * format et l'appartenance à la fenêtre 8h-22h sont vérifiés ici.
  */
 export async function createDevoirAction(
   input: DevoirFormInput
@@ -106,10 +119,28 @@ export async function createDevoirAction(
   if (!echeance.ok) {
     return { ok: false, error: "Date d'échéance invalide." };
   }
-  const scheduleSlotId =
-    input.scheduleSlotId && input.scheduleSlotId.trim().length > 0
-      ? input.scheduleSlotId
-      : null;
+
+  const rawWeekday = input.plannedWeekday?.trim() || "";
+  const rawStartTime = input.plannedStartTime?.trim() || "";
+  if ((rawWeekday.length > 0) !== (rawStartTime.length > 0)) {
+    return { ok: false, error: "Créneau incomplet." };
+  }
+  if (rawWeekday.length > 0 && !isWeekday(rawWeekday)) {
+    return { ok: false, error: "Jour invalide." };
+  }
+  if (rawStartTime.length > 0) {
+    if (!TIME_PATTERN.test(rawStartTime)) {
+      return { ok: false, error: "Horaire invalide." };
+    }
+    // Le sélecteur ne propose que la fenêtre 8h-22h (retour utilisateur --
+    // "de 8h à 22h") -- un appel direct pourrait la contourner sans ce
+    // garde-fou, même s'il ne vérifie pas la disponibilité réelle du créneau.
+    if (rawStartTime < DEFAULT_FREE_WINDOW_START || rawStartTime > DEFAULT_FREE_WINDOW_END) {
+      return { ok: false, error: "Horaire hors de la plage 8h-22h." };
+    }
+  }
+  const plannedWeekday = isWeekday(rawWeekday) ? rawWeekday : null;
+  const plannedStartTime = rawStartTime.length > 0 ? rawStartTime : null;
 
   try {
     const user = await ensureSeedUser();
@@ -119,7 +150,8 @@ export async function createDevoirAction(
       description,
       input.aRendre ?? false,
       echeance.value,
-      scheduleSlotId
+      plannedWeekday,
+      plannedStartTime
     );
     revalidateAccueil();
     revalidateEdt();

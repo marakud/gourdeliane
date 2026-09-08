@@ -2,7 +2,11 @@
 
 import { useRef, useState, type KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
-import { DayView, type DayViewSlot } from "@/components/schedule/day-view";
+import {
+  DayView,
+  type DayViewPlannedDevoir,
+  type DayViewSlot,
+} from "@/components/schedule/day-view";
 import {
   WeekSchedule,
   type WeekScheduleSlot,
@@ -13,8 +17,16 @@ import {
 // côté serveur (app/edt/page.tsx, AD-4) -- ce composant ne fait que garder
 // l'onglet actif en mémoire côté client, aucun calcul de date ici.
 export interface EdtViewTabsProps {
-  today: { slots: DayViewSlot[]; emptyMessage: string };
-  tomorrow: { slots: DayViewSlot[]; emptyMessage: string };
+  today: {
+    slots: DayViewSlot[];
+    plannedDevoirs?: DayViewPlannedDevoir[];
+    emptyMessage: string;
+  };
+  tomorrow: {
+    slots: DayViewSlot[];
+    plannedDevoirs?: DayViewPlannedDevoir[];
+    emptyMessage: string;
+  };
   week: {
     slots: WeekScheduleSlot[];
     subjectNames: string[];
@@ -99,7 +111,11 @@ export function EdtViewTabs({ today, tomorrow, week }: EdtViewTabsProps) {
         aria-labelledby="edt-tab-today"
         hidden={active !== "today"}
       >
-        <DayView slots={today.slots} emptyMessage={today.emptyMessage} />
+        <DayView
+          slots={today.slots}
+          plannedDevoirs={today.plannedDevoirs}
+          emptyMessage={today.emptyMessage}
+        />
       </div>
       <div
         id="edt-panel-tomorrow"
@@ -107,7 +123,11 @@ export function EdtViewTabs({ today, tomorrow, week }: EdtViewTabsProps) {
         aria-labelledby="edt-tab-tomorrow"
         hidden={active !== "tomorrow"}
       >
-        <DayView slots={tomorrow.slots} emptyMessage={tomorrow.emptyMessage} />
+        <DayView
+          slots={tomorrow.slots}
+          plannedDevoirs={tomorrow.plannedDevoirs}
+          emptyMessage={tomorrow.emptyMessage}
+        />
       </div>
       <div
         id="edt-panel-week"

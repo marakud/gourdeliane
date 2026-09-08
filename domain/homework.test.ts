@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attachDevoirsToSlots, computeDaysRemaining } from "./homework";
+import { computeDaysRemaining, filterDevoirsForWeekday } from "./homework";
 
 describe("computeDaysRemaining (spec 2.4 amendment I/O matrix)", () => {
   it("returns 0 when the échéance is today", () => {
@@ -19,105 +19,98 @@ describe("computeDaysRemaining (spec 2.4 amendment I/O matrix)", () => {
   });
 });
 
-describe("attachDevoirsToSlots (spec 2.4 amendment -- lien EDT)", () => {
+describe("filterDevoirsForWeekday (spec 2.4 amendment -- retour utilisateur, disponibilité EDT)", () => {
   const maths = { name: "Maths", colorIndex: 1 };
-  const slotA = { id: "slot-a" };
-  const slotB = { id: "slot-b" };
 
-  it("attaches a devoir to the matching slot, keyed by scheduleSlotId", () => {
+  it("keeps only devoirs planned for the given weekday", () => {
     const devoirs = [
       {
         id: "d1",
-        description: "Exos p.42",
+        description: "Lundi",
         done: false,
-        scheduleSlotId: "slot-a",
-        subject: maths,
-      },
-    ];
-
-    const result = attachDevoirsToSlots([slotA, slotB], devoirs);
-
-    expect(result.find((s) => s.id === "slot-a")?.devoirs).toEqual([
-      { id: "d1", description: "Exos p.42", done: false, subject: maths },
-    ]);
-    expect(result.find((s) => s.id === "slot-b")?.devoirs).toBeUndefined();
-  });
-
-  it("swapping the lookup key would break this -- confirms the join key is id, not subject", () => {
-    const otherSubject = { name: "EPS", colorIndex: 2 };
-    const devoirs = [
-      {
-        id: "d1",
-        description: "Tenue de sport",
-        done: false,
-        scheduleSlotId: "slot-b",
-        subject: otherSubject,
-      },
-    ];
-
-    const result = attachDevoirsToSlots([slotA, slotB], devoirs);
-
-    expect(result.find((s) => s.id === "slot-a")?.devoirs).toBeUndefined();
-    expect(result.find((s) => s.id === "slot-b")?.devoirs?.[0].id).toBe("d1");
-  });
-
-  it("returns undefined (not an empty array) for a slot with no attached devoirs", () => {
-    const result = attachDevoirsToSlots([slotA], []);
-    expect(result[0].devoirs).toBeUndefined();
-  });
-
-  it("ignores a devoir with no scheduleSlotId", () => {
-    const devoirs = [
-      {
-        id: "d1",
-        description: "Sans créneau",
-        done: false,
-        scheduleSlotId: null,
-        subject: maths,
-      },
-    ];
-
-    const result = attachDevoirsToSlots([slotA], devoirs);
-    expect(result[0].devoirs).toBeUndefined();
-  });
-
-  it("ignores a devoir whose scheduleSlotId matches no provided slot", () => {
-    const devoirs = [
-      {
-        id: "d1",
-        description: "Créneau d'un autre jour",
-        done: false,
-        scheduleSlotId: "slot-elsewhere",
-        subject: maths,
-      },
-    ];
-
-    const result = attachDevoirsToSlots([slotA], devoirs);
-    expect(result[0].devoirs).toBeUndefined();
-  });
-
-  it("groups multiple devoirs under the same slot and preserves each devoir's own done state", () => {
-    const devoirs = [
-      {
-        id: "d1",
-        description: "Premier",
-        done: true,
-        scheduleSlotId: "slot-a",
+        plannedWeekday: "MONDAY",
+        plannedStartTime: "16:00",
         subject: maths,
       },
       {
         id: "d2",
-        description: "Second",
+        description: "Mardi",
         done: false,
-        scheduleSlotId: "slot-a",
+        plannedWeekday: "TUESDAY",
+        plannedStartTime: "16:00",
         subject: maths,
       },
     ];
 
-    const result = attachDevoirsToSlots([slotA], devoirs);
-    expect(result[0].devoirs).toEqual([
-      { id: "d1", description: "Premier", done: true, subject: maths },
-      { id: "d2", description: "Second", done: false, subject: maths },
-    ]);
+    const result = filterDevoirsForWeekday(devoirs, "MONDAY");
+
+    expect(result.map((d) => d.id)).toEqual(["d1"]);
+  });
+
+  it("excludes an unplanned devoir (no plannedWeekday) regardless of weekday", () => {
+    const devoirs = [
+      {
+        id: "d1",
+        description: "Pas programmé",
+        done: false,
+        plannedWeekday: null,
+        plannedStartTime: null,
+        subject: maths,
+      },
+    ];
+
+    expect(filterDevoirsForWeekday(devoirs, "MONDAY")).toEqual([]);
+  });
+
+  it("sorts multiple devoirs planned the same day by start time", () => {
+    const devoirs = [
+      {
+        id: "d1",
+        description: "Plus tard",
+        done: false,
+        plannedWeekday: "MONDAY",
+        plannedStartTime: "18:00",
+        subject: maths,
+      },
+      {
+        id: "d2",
+        description: "Plus tôt",
+        done: false,
+        plannedWeekday: "MONDAY",
+        plannedStartTime: "09:00",
+        subject: maths,
+      },
+    ];
+
+    const result = filterDevoirsForWeekday(devoirs, "MONDAY");
+
+    expect(result.map((d) => d.id)).toEqual(["d2", "d1"]);
+  });
+
+  it("returns an empty array when no devoir is planned for that day", () => {
+    expect(filterDevoirsForWeekday([], "SUNDAY")).toEqual([]);
+  });
+
+  it("preserves each devoir's own done state and subject", () => {
+    const devoirs = [
+      {
+        id: "d1",
+        description: "Fait",
+        done: true,
+        plannedWeekday: "MONDAY",
+        plannedStartTime: "16:00",
+        subject: maths,
+      },
+    ];
+
+    const result = filterDevoirsForWeekday(devoirs, "MONDAY");
+
+    expect(result[0]).toEqual({
+      id: "d1",
+      description: "Fait",
+      done: true,
+      subject: maths,
+      plannedStartTime: "16:00",
+    });
   });
 });

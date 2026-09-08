@@ -25,12 +25,15 @@ const TEST_DESCRIPTIONS = [
   "action-test-devoir-untoggle",
   "action-test-devoir-bad-echeance",
   "action-test-devoir-invalid-calendar-date",
-  "action-test-devoir-slot",
+  "action-test-devoir-planned",
+  "action-test-devoir-partial-plan-day",
+  "action-test-devoir-partial-plan-time",
+  "action-test-devoir-bad-weekday",
+  "action-test-devoir-bad-time",
   "action-test-devoir-delete",
 ];
 
 let subjectId: string;
-let scheduleSlotId: string;
 
 async function ensureTestSubject() {
   const user = await ensureSeedUser();
@@ -41,29 +44,10 @@ async function ensureTestSubject() {
   return subject;
 }
 
-async function ensureTestSlot() {
-  const user = await ensureSeedUser();
-  if (!subjectId) await ensureTestSubject();
-  const slot = await prisma.scheduleSlot.create({
-    data: {
-      userId: user.id,
-      subjectId,
-      weekday: "THURSDAY",
-      startTime: "08:00",
-      endTime: "09:00",
-    },
-  });
-  scheduleSlotId = slot.id;
-  return slot;
-}
-
 afterAll(async () => {
   await prisma.devoir.deleteMany({
     where: { description: { in: TEST_DESCRIPTIONS } },
   });
-  if (scheduleSlotId) {
-    await prisma.scheduleSlot.delete({ where: { id: scheduleSlotId } }).catch(() => {});
-  }
   if (subjectId) {
     await prisma.subject.delete({ where: { id: subjectId } }).catch(() => {});
   }
@@ -86,7 +70,8 @@ describe("createDevoirAction -- création minimale (spec 2.4 I/O matrix)", () =>
     expect(devoir?.aRendre).toBe(false);
     expect(devoir?.echeance).toBeNull();
     expect(devoir?.done).toBe(false);
-    expect(devoir?.scheduleSlotId).toBeNull();
+    expect(devoir?.plannedWeekday).toBeNull();
+    expect(devoir?.plannedStartTime).toBeNull();
   });
 
   it("accepte aRendre + echeance quand fournis", async () => {
@@ -107,20 +92,68 @@ describe("createDevoirAction -- création minimale (spec 2.4 I/O matrix)", () =>
     expect(devoir?.echeance?.toISOString().slice(0, 10)).toBe("2026-12-20");
   });
 
-  it("accepte un rattachement à un créneau EDT existant (retour utilisateur Story 2.4)", async () => {
-    await ensureTestSlot();
+  it("accepte un placement (jour + heure) dans un trou libre de l'EDT (retour utilisateur Story 2.4)", async () => {
+    await ensureTestSubject();
 
     const result = await createDevoirAction({
       subjectId,
-      description: "action-test-devoir-slot",
-      scheduleSlotId,
+      description: "action-test-devoir-planned",
+      plannedWeekday: "THURSDAY",
+      plannedStartTime: "16:00",
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
     const devoir = await prisma.devoir.findUnique({ where: { id: result.data.id } });
-    expect(devoir?.scheduleSlotId).toBe(scheduleSlotId);
+    expect(devoir?.plannedWeekday).toBe("THURSDAY");
+    expect(devoir?.plannedStartTime).toBe("16:00");
+  });
+
+  it("rejette un jour sans heure (créneau incomplet)", async () => {
+    await ensureTestSubject();
+
+    const result = await createDevoirAction({
+      subjectId,
+      description: "action-test-devoir-partial-plan-day",
+      plannedWeekday: "THURSDAY",
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejette une heure sans jour (créneau incomplet)", async () => {
+    await ensureTestSubject();
+
+    const result = await createDevoirAction({
+      subjectId,
+      description: "action-test-devoir-partial-plan-time",
+      plannedStartTime: "16:00",
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejette un jour de la semaine invalide", async () => {
+    await ensureTestSubject();
+
+    const result = await createDevoirAction({
+      subjectId,
+      description: "action-test-devoir-bad-weekday",
+      plannedWeekday: "SOMEDAY",
+      plannedStartTime: "16:00",
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejette un horaire mal formé", async () => {
+    await ensureTestSubject();
+
+    const result = await createDevoirAction({
+      subjectId,
+      description: "action-test-devoir-bad-time",
+      plannedWeekday: "THURSDAY",
+      plannedStartTime: "16h00",
+    });
+    expect(result.ok).toBe(false);
   });
 
   it("rejette une description vide", async () => {

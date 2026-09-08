@@ -22,7 +22,9 @@ export interface DevoirView {
   // n'a jamais à recalculer une date lui-même.
   echeanceLabel: string | null;
   daysRemaining: number | null;
-  scheduleSlot: { subjectName: string; weekday: string; startTime: string } | null;
+  // Placement dans un trou libre de l'EDT (retour utilisateur Story 2.4,
+  // 2e itération) -- `weekday` déjà en libellé français (WEEKDAY_LABELS).
+  planned: { weekday: string; startTime: string } | null;
 }
 
 export type ToggleDevoirDoneAction = (input: {
@@ -219,10 +221,10 @@ export function DevoirsList({ devoirs, onToggle, onDelete }: DevoirsListProps) {
                         {devoir.echeanceLabel && devoir.daysRemaining !== null && (
                           <> · Échéance : {devoir.echeanceLabel} ({daysRemainingLabel(devoir.daysRemaining)})</>
                         )}
-                        {devoir.scheduleSlot && (
+                        {devoir.planned && (
                           <>
                             {" "}
-                            · {devoir.scheduleSlot.weekday} {devoir.scheduleSlot.startTime}
+                            · {devoir.planned.weekday} {devoir.planned.startTime}
                           </>
                         )}
                       </span>

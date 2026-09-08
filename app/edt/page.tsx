@@ -5,7 +5,7 @@ import { listDevoirs } from "@/data/homework";
 import { EdtViewTabs } from "@/components/schedule/edt-view-tabs";
 import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
 import { deriveDaySlots, type Weekday } from "@/domain/schedule";
-import { attachDevoirsToSlots } from "@/domain/homework";
+import { filterDevoirsForWeekday } from "@/domain/homework";
 import {
   getTodaySchoolDate,
   getTomorrowSchoolDate,
@@ -69,14 +69,16 @@ export default async function EdtPage() {
     noSchoolDayIsoSet
   );
 
-  // Devoirs rattachés à un créneau (Story 2.4, retour utilisateur
-  // "programmer le devoir dans l'EDT") : affichage en lecture seule sous le
-  // créneau concerné dans "Aujourd'hui"/"Demain" -- cocher/supprimer reste
-  // réservé au bloc "Devoirs" d'Accueil (Code Map). `attachDevoirsToSlots`
-  // (domain/homework.ts, testé) fait le regroupement -- jamais recalculé ici.
+  // Devoirs programmés dans un trou libre (Story 2.4, retour utilisateur
+  // "programmer le devoir dans l'EDT" -- disponibilité réelle, pas un
+  // rattachement à un cours) : affichage en lecture seule dans
+  // "Aujourd'hui"/"Demain" -- cocher/supprimer reste réservé au bloc
+  // "Devoirs" d'Accueil (Code Map). Indépendant de `noSchoolDayIsoSet` : un
+  // jour "sans cours" n'annule pas le temps personnel que l'enfant s'est
+  // programmé ce jour-là.
   const devoirs = await listDevoirs(user.id);
-  const todaySlotsWithDevoirs = attachDevoirsToSlots(todaySlots, devoirs);
-  const tomorrowSlotsWithDevoirs = attachDevoirsToSlots(tomorrowSlots, devoirs);
+  const todayPlannedDevoirs = filterDevoirsForWeekday(devoirs, todayWeekday);
+  const tomorrowPlannedDevoirs = filterDevoirsForWeekday(devoirs, tomorrowWeekday);
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-8">
@@ -90,11 +92,13 @@ export default async function EdtPage() {
       </div>
       <EdtViewTabs
         today={{
-          slots: todaySlotsWithDevoirs,
+          slots: todaySlots,
+          plannedDevoirs: todayPlannedDevoirs,
           emptyMessage: "Pas cours aujourd'hui, profite de ta journée !",
         }}
         tomorrow={{
-          slots: tomorrowSlotsWithDevoirs,
+          slots: tomorrowSlots,
+          plannedDevoirs: tomorrowPlannedDevoirs,
           emptyMessage: "Pas cours demain, profite de ta soirée !",
         }}
         week={{

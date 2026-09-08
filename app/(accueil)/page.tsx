@@ -203,13 +203,13 @@ export default async function AccueilPage() {
       daysRemaining: echeanceIso
         ? computeDaysRemaining(echeanceIso, todayIso)
         : null,
-      scheduleSlot: devoir.scheduleSlot
-        ? {
-            subjectName: devoir.subject.name,
-            weekday: WEEKDAY_LABELS[devoir.scheduleSlot.weekday as Weekday],
-            startTime: devoir.scheduleSlot.startTime,
-          }
-        : null,
+      planned:
+        devoir.plannedWeekday && devoir.plannedStartTime
+          ? {
+              weekday: WEEKDAY_LABELS[devoir.plannedWeekday as Weekday],
+              startTime: devoir.plannedStartTime,
+            }
+          : null,
     };
   });
 

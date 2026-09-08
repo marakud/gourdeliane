@@ -13,7 +13,6 @@ import {
 // interférer si les fichiers de test tournent en parallèle.
 const TEST_USER_ID = "test-user-homework-integration";
 let subjectId: string;
-let scheduleSlotId: string;
 
 beforeAll(async () => {
   await prisma.user.upsert({
@@ -25,16 +24,6 @@ beforeAll(async () => {
     data: { userId: TEST_USER_ID, name: "Test Homework Subject", colorIndex: 1 },
   });
   subjectId = subject.id;
-  const slot = await prisma.scheduleSlot.create({
-    data: {
-      userId: TEST_USER_ID,
-      subjectId,
-      weekday: "THURSDAY",
-      startTime: "08:00",
-      endTime: "09:00",
-    },
-  });
-  scheduleSlotId = slot.id;
 });
 
 afterAll(async () => {
@@ -53,7 +42,8 @@ describe("createDevoir -- création minimale (spec 2.4 I/O matrix)", () => {
     expect(devoir.echeance).toBeNull();
     expect(devoir.done).toBe(false);
     expect(devoir.subjectId).toBe(subjectId);
-    expect(devoir.scheduleSlotId).toBeNull();
+    expect(devoir.plannedWeekday).toBeNull();
+    expect(devoir.plannedStartTime).toBeNull();
   });
 
   it("accepte aRendre et echeance quand fournis", async () => {
@@ -70,18 +60,19 @@ describe("createDevoir -- création minimale (spec 2.4 I/O matrix)", () => {
     expect(devoir.echeance?.toISOString()).toBe(echeance.toISOString());
   });
 
-  it("accepte un rattachement à un créneau EDT existant (retour utilisateur Story 2.4)", async () => {
+  it("accepte un placement dans un trou libre de l'EDT (retour utilisateur Story 2.4)", async () => {
     const devoir = await createDevoir(
       TEST_USER_ID,
       subjectId,
-      "Réviser pour jeudi",
+      "Réviser jeudi 16h",
       false,
       null,
-      scheduleSlotId
+      "THURSDAY",
+      "16:00"
     );
 
-    expect(devoir.scheduleSlotId).toBe(scheduleSlotId);
-    expect(devoir.scheduleSlot?.id).toBe(scheduleSlotId);
+    expect(devoir.plannedWeekday).toBe("THURSDAY");
+    expect(devoir.plannedStartTime).toBe("16:00");
   });
 });
 
@@ -147,7 +138,7 @@ describe("deleteDevoir -- suppression définitive, scopée par (id, userId)", ()
   });
 });
 
-describe("listDevoirs -- ordre createdAt asc, matière et créneau inclus", () => {
+describe("listDevoirs -- ordre createdAt asc, matière incluse", () => {
   it("renvoie les devoirs dans l'ordre de création, avec leur matière", async () => {
     const before = await listDevoirs(TEST_USER_ID);
     const beforeIds = new Set(before.map((d) => d.id));

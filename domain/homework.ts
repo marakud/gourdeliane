@@ -5,6 +5,8 @@
 // les dates "aujourd'hui" sont toujours reçues en `todayIso` explicite par
 // l'appelant (app/(accueil)/page.tsx, calculé via domain/school-day.ts).
 
+import type { Weekday } from "./schedule";
+
 /**
  * Nombre de jours calendaires entre `todayIso` et `echeanceIso` (positif si
  * l'échéance est à venir, 0 si aujourd'hui, négatif si dépassée). Les deux
@@ -33,48 +35,48 @@ function parseIsoDate(iso: string): [number, number, number] {
   return [year, month - 1, day];
 }
 
-/** Un devoir tel qu'attaché à un créneau EDT (Story 2.4, retour utilisateur
- * "programmer le devoir dans l'EDT") -- projection minimale affichée en
- * lecture seule sous le créneau concerné (components/schedule/day-view.tsx).
+/** Un devoir programmé pour un jour donné (Story 2.4, retour utilisateur
+ * "programmer le devoir dans l'EDT" -- placé dans un trou libre, pas
+ * rattaché à un créneau/cours existant, cf. `computeWeeklyFreeGaps`,
+ * domain/schedule.ts) -- projection minimale affichée en lecture seule dans
+ * la vue EDT du jour concerné (components/schedule/day-view.tsx).
  */
-export interface DevoirSlotAttachment {
+export interface PlannedDevoirView {
   id: string;
   description: string;
   done: boolean;
   subject: { name: string; colorIndex: number };
+  plannedStartTime: string;
 }
 
 /**
- * Regroupe les devoirs rattachés (`scheduleSlotId` non nul) par créneau, et
- * les attache à la liste de créneaux fournie (une entrée par créneau, tableau
- * vide -> `undefined`, jamais `[]`, pour que l'appelant puisse tester
- * `slot.devoirs?.length` sans distinguo). Pure : ne fait aucune requête,
- * reçoit `slots`/`devoirs` déjà chargés par l'appelant (app/edt/page.tsx).
- * Un devoir dont le `scheduleSlotId` ne correspond à aucun `slot` fourni est
- * silencieusement ignoré (ex. créneau d'un autre jour de la semaine que la
- * vue "Aujourd'hui"/"Demain" en cours n'a pas chargé).
+ * Filtre les devoirs programmés pour `weekday`, triés par heure. Pure : ne
+ * fait aucune requête, reçoit `devoirs` déjà chargés par l'appelant
+ * (app/edt/page.tsx). Un devoir sans `plannedWeekday`/`plannedStartTime`
+ * (non programmé) n'apparaît jamais ici, quel que soit `weekday`.
  */
-export function attachDevoirsToSlots<S extends { id: string }>(
-  slots: readonly S[],
+export function filterDevoirsForWeekday(
   devoirs: readonly {
     id: string;
     description: string;
     done: boolean;
-    scheduleSlotId: string | null;
+    plannedWeekday: string | null;
+    plannedStartTime: string | null;
     subject: { name: string; colorIndex: number };
-  }[]
-): (S & { devoirs: DevoirSlotAttachment[] | undefined })[] {
-  const bySlotId = new Map<string, DevoirSlotAttachment[]>();
-  for (const devoir of devoirs) {
-    if (!devoir.scheduleSlotId) continue;
-    const list = bySlotId.get(devoir.scheduleSlotId) ?? [];
-    list.push({
+  }[],
+  weekday: Weekday
+): PlannedDevoirView[] {
+  return devoirs
+    .filter(
+      (devoir): devoir is typeof devoir & { plannedStartTime: string } =>
+        devoir.plannedWeekday === weekday && devoir.plannedStartTime !== null
+    )
+    .map((devoir) => ({
       id: devoir.id,
       description: devoir.description,
       done: devoir.done,
       subject: devoir.subject,
-    });
-    bySlotId.set(devoir.scheduleSlotId, list);
-  }
-  return slots.map((slot) => ({ ...slot, devoirs: bySlotId.get(slot.id) }));
+      plannedStartTime: devoir.plannedStartTime,
+    }))
+    .sort((a, b) => a.plannedStartTime.localeCompare(b.plannedStartTime));
 }

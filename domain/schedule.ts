@@ -74,8 +74,9 @@ export type SlotValidationResult =
 
 // "HH:mm", heures 00-23, minutes 00-59 -- zéro-paddé pour que la comparaison
 // lexicographique (utilisée pour le tri et la comparaison fin > début) soit
-// correcte.
-const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+// correcte. Exportée : actions/homework.ts valide `plannedStartTime` avec ce
+// même motif plutôt que d'en dupliquer une copie (corrigé en revue).
+export const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /**
  * Valide la saisie d'un créneau d'emploi du temps. Pure -- aucune dépendance
@@ -172,5 +173,83 @@ export function dedupeSubjectsFromSlots<S extends { subject: { name: string } }>
     }
   }
 
+  return result;
+}
+
+// Fenêtre par défaut dans laquelle chercher des trous libres (retour
+// utilisateur Story 2.4 : "tous les trous possibles de la semaine de lundi
+// à dimanche de 8h à 22h").
+export const DEFAULT_FREE_WINDOW_START = "08:00";
+export const DEFAULT_FREE_WINDOW_END = "22:00";
+
+export interface FreeGap {
+  start: string; // "HH:mm"
+  end: string; // "HH:mm"
+}
+
+/**
+ * Calcule les trous libres d'UN jour (aucun créneau) à l'intérieur d'une
+ * fenêtre horaire (08:00-22:00 par défaut) -- retour utilisateur Story 2.4 :
+ * "programmer le devoir dans l'EDT" doit proposer de la disponibilité
+ * réelle, pas les créneaux (cours) eux-mêmes. Pure -- trie `daySlots`
+ * elle-même par `startTime` avant de soustraire, l'appelant n'a pas besoin
+ * de les pré-trier. Plusieurs créneaux qui se chevauchent ne produisent
+ * jamais de trou négatif : le curseur ne recule jamais. Un créneau
+ * entièrement hors fenêtre est ignoré ; un créneau qui déborde la fenêtre
+ * (avant `windowStart` ou après `windowEnd`) est rogné à ses bornes avant
+ * d'être soustrait -- sans ce rognage, un trou pourrait s'étendre au-delà
+ * de `windowEnd` (bug de revue : un créneau à 23h avec une fenêtre finissant
+ * à 22h produisait un trou "...-23:00" au lieu de "...-22:00").
+ */
+export function computeFreeGaps(
+  daySlots: readonly { startTime: string; endTime: string }[],
+  windowStart: string = DEFAULT_FREE_WINDOW_START,
+  windowEnd: string = DEFAULT_FREE_WINDOW_END
+): FreeGap[] {
+  const sorted = daySlots
+    .filter((slot) => slot.endTime > windowStart && slot.startTime < windowEnd)
+    .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  const gaps: FreeGap[] = [];
+  let cursor = windowStart;
+
+  for (const slot of sorted) {
+    const clippedStart = slot.startTime > windowStart ? slot.startTime : windowStart;
+    const clippedEnd = slot.endTime < windowEnd ? slot.endTime : windowEnd;
+    if (clippedStart > cursor) {
+      gaps.push({ start: cursor, end: clippedStart });
+    }
+    if (clippedEnd > cursor) {
+      cursor = clippedEnd;
+    }
+  }
+
+  if (cursor < windowEnd) {
+    gaps.push({ start: cursor, end: windowEnd });
+  }
+
+  return gaps;
+}
+
+/**
+ * Même calcul que `computeFreeGaps`, mais pour les 7 jours de la semaine
+ * d'un coup (lundi à dimanche, retour utilisateur Story 2.4) -- regroupe
+ * `allSlots` par `weekday` puis délègue à `computeFreeGaps` pour chacun.
+ */
+export function computeWeeklyFreeGaps(
+  allSlots: readonly { weekday: Weekday; startTime: string; endTime: string }[],
+  windowStart: string = DEFAULT_FREE_WINDOW_START,
+  windowEnd: string = DEFAULT_FREE_WINDOW_END
+): Record<Weekday, FreeGap[]> {
+  const byDay = new Map<Weekday, { startTime: string; endTime: string }[]>(
+    WEEKDAYS.map((day) => [day, []])
+  );
+  for (const slot of allSlots) {
+    byDay.get(slot.weekday)?.push(slot);
+  }
+
+  const result = {} as Record<Weekday, FreeGap[]>;
+  for (const day of WEEKDAYS) {
+    result[day] = computeFreeGaps(byDay.get(day) ?? [], windowStart, windowEnd);
+  }
   return result;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, useTransition, type FormEvent } from "react";
+import { useId, useMemo, useState, useTransition, type FormEvent } from "react";
 import { Plus } from "lucide-react";
 import {
   Dialog,
@@ -23,9 +23,10 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { createDevoirAction, type DevoirFormInput } from "@/actions/homework";
 import {
-  ScheduleSlotPicker,
-  type ScheduleSlotPickerSlot,
-} from "@/components/homework/schedule-slot-picker";
+  FreeTimePicker,
+  type FreeTimePickerValue,
+} from "@/components/homework/free-time-picker";
+import { computeWeeklyFreeGaps, type Weekday } from "@/domain/schedule";
 
 // FAB "Ajouter un devoir", dupliqué sur Accueil et EDT (Boundaries spec 2.4 :
 // pas de layout partagé pour ces deux routes, cf. app/layout.tsx) -- même
@@ -33,10 +34,11 @@ import {
 // conditionnel sur usePathname() (Design Notes). Formulaire mirror
 // `SlotFormDialog` (components/schedule/slot-form-dialog.tsx) : Dialog +
 // Select + Input, `useTransition`, ferme immédiatement au submit réussi
-// (Boundaries : "sans écran de confirmation"). Rattachement à un créneau
-// existant ("programmer le devoir dans l'EDT", retour utilisateur Story
-// 2.4) via `ScheduleSlotPicker` -- mini grille type EDT, remplace un premier
-// essai en liste déroulante jugé pas assez visuel.
+// (Boundaries : "sans écran de confirmation"). Placement dans un trou libre
+// de l'EDT ("programmer le devoir dans l'EDT", retour utilisateur Story
+// 2.4 -- 2e itération : disponibilité réelle, pas un rattachement à un
+// cours) via `FreeTimePicker` -- mini grille type EDT, `computeWeeklyFreeGaps`
+// (domain/schedule.ts) calculée ici à partir des créneaux bruts reçus.
 
 export interface AddHomeworkFabSubject {
   id: string;
@@ -44,7 +46,11 @@ export interface AddHomeworkFabSubject {
   colorIndex: number;
 }
 
-export type AddHomeworkFabSlot = ScheduleSlotPickerSlot;
+export interface AddHomeworkFabSlot {
+  weekday: Weekday;
+  startTime: string;
+  endTime: string;
+}
 
 export interface AddHomeworkFabProps {
   subjects: AddHomeworkFabSubject[];
@@ -56,7 +62,8 @@ const EMPTY_FORM: DevoirFormInput = {
   description: "",
   aRendre: false,
   echeance: "",
-  scheduleSlotId: "",
+  plannedWeekday: "",
+  plannedStartTime: "",
 };
 
 export function AddHomeworkFab({
@@ -68,6 +75,20 @@ export function AddHomeworkFab({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const ariaCheckboxId = useId();
+
+  // Recalculé seulement quand `scheduleSlots` change (pas à chaque frappe
+  // dans description/échéance -- correctif de revue).
+  const weeklyGaps = useMemo(
+    () => computeWeeklyFreeGaps(scheduleSlots),
+    [scheduleSlots]
+  );
+  const plannedValue: FreeTimePickerValue | null =
+    form.plannedWeekday && form.plannedStartTime
+      ? {
+          weekday: form.plannedWeekday as Weekday,
+          startTime: form.plannedStartTime,
+        }
+      : null;
 
   function resetAndOpen(nextOpen: boolean) {
     setOpen(nextOpen);
@@ -193,18 +214,20 @@ export function AddHomeworkFab({
             />
           </div>
 
-          {scheduleSlots.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              <Label>Programmer dans l&apos;EDT (optionnel)</Label>
-              <ScheduleSlotPicker
-                slots={scheduleSlots}
-                value={form.scheduleSlotId || null}
-                onChange={(slotId) =>
-                  setForm((f) => ({ ...f, scheduleSlotId: slotId ?? "" }))
-                }
-              />
-            </div>
-          )}
+          <div className="flex flex-col gap-1.5">
+            <Label>Programmer dans l&apos;EDT (optionnel)</Label>
+            <FreeTimePicker
+              weeklyGaps={weeklyGaps}
+              value={plannedValue}
+              onChange={(next) =>
+                setForm((f) => ({
+                  ...f,
+                  plannedWeekday: next?.weekday ?? "",
+                  plannedStartTime: next?.startTime ?? "",
+                }))
+              }
+            />
+          </div>
 
           {error && (
             <p role="alert" className="text-sm font-medium text-destructive">
