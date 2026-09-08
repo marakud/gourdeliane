@@ -4,11 +4,7 @@ import { getScheduleForUser } from "@/data/schedule";
 import { listDevoirs } from "@/data/homework";
 import { EdtViewTabs } from "@/components/schedule/edt-view-tabs";
 import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
-import {
-  deriveDaySlots,
-  formatSlotLabel,
-  type Weekday,
-} from "@/domain/schedule";
+import { deriveDaySlots, type Weekday } from "@/domain/schedule";
 import { attachDevoirsToSlots } from "@/domain/homework";
 import {
   getTodaySchoolDate,
@@ -82,11 +78,6 @@ export default async function EdtPage() {
   const todaySlotsWithDevoirs = attachDevoirsToSlots(todaySlots, devoirs);
   const tomorrowSlotsWithDevoirs = attachDevoirsToSlots(tomorrowSlots, devoirs);
 
-  const homeworkScheduleSlots = slots.map((slot) => ({
-    id: slot.id,
-    label: formatSlotLabel(slot),
-  }));
-
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-8">
       <div>
@@ -119,7 +110,7 @@ export default async function EdtPage() {
           name: subject.name,
           colorIndex: subject.colorIndex,
         }))}
-        scheduleSlots={homeworkScheduleSlots}
+        scheduleSlots={slots}
       />
     </div>
   );

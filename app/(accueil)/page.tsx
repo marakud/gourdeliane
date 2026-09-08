@@ -10,7 +10,6 @@ import { listDevoirs } from "@/data/homework";
 import {
   dedupeSubjectsFromSlots,
   deriveDaySlots,
-  formatSlotLabel,
   WEEKDAY_LABELS,
   type Weekday,
 } from "@/domain/schedule";
@@ -220,14 +219,6 @@ export default async function AccueilPage() {
     colorIndex: subject.colorIndex,
   }));
 
-  // Créneaux existants proposés dans le sélecteur "Programmer dans l'EDT" du
-  // FAB (retour utilisateur Story 2.4) -- même liste que celle déjà chargée
-  // pour l'EDT, reformatée en libellé lisible.
-  const homeworkScheduleSlots = slots.map((slot) => ({
-    id: slot.id,
-    label: formatSlotLabel(slot),
-  }));
-
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-8">
       <div>
@@ -269,10 +260,7 @@ export default async function AccueilPage() {
         onDelete={deleteDevoirAction}
       />
 
-      <AddHomeworkFab
-        subjects={homeworkSubjects}
-        scheduleSlots={homeworkScheduleSlots}
-      />
+      <AddHomeworkFab subjects={homeworkSubjects} scheduleSlots={slots} />
     </div>
   );
 }

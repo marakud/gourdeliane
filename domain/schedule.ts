@@ -34,20 +34,6 @@ export function isWeekday(value: string): value is Weekday {
   return (WEEKDAYS as readonly string[]).includes(value);
 }
 
-/**
- * Libellé lisible d'un créneau (ex. "Maths -- jeudi 08:00"), utilisé par le
- * sélecteur "Programmer dans l'EDT" du FAB devoirs (Story 2.4, retour
- * utilisateur) -- factorisé ici plutôt que dupliqué dans chaque page qui en
- * a besoin (Accueil et EDT chargent toutes deux la même liste de créneaux).
- */
-export function formatSlotLabel(slot: {
-  subject: { name: string };
-  weekday: Weekday;
-  startTime: string;
-}): string {
-  return `${slot.subject.name} -- ${WEEKDAY_LABELS[slot.weekday].toLowerCase()} ${slot.startTime}`;
-}
-
 // Palette catégorielle subject-1 à subject-8 (DESIGN.md), cyclique au-delà.
 const SUBJECT_COLOR_COUNT = 8;
 

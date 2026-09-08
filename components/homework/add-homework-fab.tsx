@@ -22,6 +22,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { createDevoirAction, type DevoirFormInput } from "@/actions/homework";
+import {
+  ScheduleSlotPicker,
+  type ScheduleSlotPickerSlot,
+} from "@/components/homework/schedule-slot-picker";
 
 // FAB "Ajouter un devoir", dupliqué sur Accueil et EDT (Boundaries spec 2.4 :
 // pas de layout partagé pour ces deux routes, cf. app/layout.tsx) -- même
@@ -29,9 +33,10 @@ import { createDevoirAction, type DevoirFormInput } from "@/actions/homework";
 // conditionnel sur usePathname() (Design Notes). Formulaire mirror
 // `SlotFormDialog` (components/schedule/slot-form-dialog.tsx) : Dialog +
 // Select + Input, `useTransition`, ferme immédiatement au submit réussi
-// (Boundaries : "sans écran de confirmation"). Sélecteur de créneau optionnel
-// ajouté suite au retour utilisateur Story 2.4 ("programmer le devoir dans
-// l'EDT" -- rattachement à un créneau existant, pas de nouvel horaire créé).
+// (Boundaries : "sans écran de confirmation"). Rattachement à un créneau
+// existant ("programmer le devoir dans l'EDT", retour utilisateur Story
+// 2.4) via `ScheduleSlotPicker` -- mini grille type EDT, remplace un premier
+// essai en liste déroulante jugé pas assez visuel.
 
 export interface AddHomeworkFabSubject {
   id: string;
@@ -39,17 +44,12 @@ export interface AddHomeworkFabSubject {
   colorIndex: number;
 }
 
-export interface AddHomeworkFabSlot {
-  id: string;
-  label: string; // ex. "Maths -- jeudi 08:00"
-}
+export type AddHomeworkFabSlot = ScheduleSlotPickerSlot;
 
 export interface AddHomeworkFabProps {
   subjects: AddHomeworkFabSubject[];
   scheduleSlots?: AddHomeworkFabSlot[];
 }
-
-const NO_SLOT_VALUE = "__none__";
 
 const EMPTY_FORM: DevoirFormInput = {
   subjectId: "",
@@ -195,35 +195,14 @@ export function AddHomeworkFab({
 
           {scheduleSlots.length > 0 && (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="devoir-slot">
-                Programmer dans l&apos;EDT (optionnel)
-              </Label>
-              <Select
-                value={form.scheduleSlotId || NO_SLOT_VALUE}
-                onValueChange={(value) =>
-                  setForm((f) => ({
-                    ...f,
-                    scheduleSlotId: value === NO_SLOT_VALUE ? "" : (value as string),
-                  }))
+              <Label>Programmer dans l&apos;EDT (optionnel)</Label>
+              <ScheduleSlotPicker
+                slots={scheduleSlots}
+                value={form.scheduleSlotId || null}
+                onChange={(slotId) =>
+                  setForm((f) => ({ ...f, scheduleSlotId: slotId ?? "" }))
                 }
-              >
-                <SelectTrigger id="devoir-slot" className="h-11 w-full text-base">
-                  <SelectValue>
-                    {(value: string | null) =>
-                      scheduleSlots.find((slot) => slot.id === value)?.label ??
-                      "Aucun créneau"
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_SLOT_VALUE}>Aucun créneau</SelectItem>
-                  {scheduleSlots.map((slot) => (
-                    <SelectItem key={slot.id} value={slot.id}>
-                      {slot.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              />
             </div>
           )}
 

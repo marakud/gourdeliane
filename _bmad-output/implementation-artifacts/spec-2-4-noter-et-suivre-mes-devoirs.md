@@ -3,7 +3,7 @@ title: 'Story 2.4 — Noter et suivre mes devoirs'
 type: 'feature'
 created: '2026-09-07'
 status: 'done'
-review_loop_iteration: 2
+review_loop_iteration: 3
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
 baseline_commit: 'ddf868a9db5bfd3abc607c0ec863fdc7aa4a6024'
@@ -53,15 +53,15 @@ baseline_commit: 'ddf868a9db5bfd3abc607c0ec863fdc7aa4a6024'
 
 - `prisma/schema.prisma`, `prisma/production/schema.prisma` -- modèle `Devoir` (id, userId+user Cascade, subjectId+subject Cascade, description, aRendre, echeance, done, createdAt, `scheduleSlotId`+`scheduleSlot` optionnel `SetNull`), `@@index([userId, done])`, back-relations `User.devoirs`/`ScheduleSlot.devoirs`
 - `domain/homework.ts` -- `computeDaysRemaining(echeanceIso, todayIso)` pure (`domain/homework.ts:19`) ; `attachDevoirsToSlots(slots, devoirs)` pure, regroupe les devoirs rattachés par `scheduleSlotId` (`domain/homework.ts:57`), testé
-- `domain/schedule.ts` -- `formatSlotLabel(slot)` pure (`domain/schedule.ts:43`), factorisée pour éviter la duplication entre Accueil et EDT
 - `data/homework.ts` -- `createDevoir(userId, subjectId, description, aRendre?, echeance?, scheduleSlotId?)` (`data/homework.ts:14`), `toggleDevoirDone(id, userId, done)` bidirectionnel (`data/homework.ts:36`), `deleteDevoir(id, userId)` (`data/homework.ts:52`), `listDevoirs(userId)` (`data/homework.ts:65`, include `scheduleSlot`)
 - `actions/homework.ts` -- `createDevoirAction` (`actions/homework.ts:95`), `toggleDevoirDoneAction` (`actions/homework.ts:144`, bidirectionnel), `deleteDevoirAction` (`actions/homework.ts:177`) ; `revalidateAccueil()`+`revalidateEdt()` après chaque mutation
 - `actions/schedule.ts` -- `createSlot`/`updateSlot` revalident aussi `/` (`revalidateAccueil`, `actions/schedule.ts:51`), car ils peuvent faire naître une `Subject` que le sélecteur du FAB doit voir sans délai
 - `components/homework/devoirs-list.tsx` -- bloc "Devoirs" (`devoirs-list.tsx:57`) : bascule bidirectionnelle + bouton supprimer, `pendingIds`/`errorIds` par ligne (`Set<string>`, pas un scalaire unique), resynchronisation `doneById` depuis les props pendant le rendu (`devoirs-list.tsx:72`) ; affiche matière/échéance/jours-restants/créneau par ligne
-- `components/homework/add-homework-fab.tsx` -- FAB + Dialog (`add-homework-fab.tsx:62`), sélecteur "Créneau" optionnel (n'apparaît que si l'utilisateur a des créneaux)
+- `components/homework/schedule-slot-picker.tsx` (nouveau, itération 3) -- mini grille type EDT pour choisir un créneau : jours groupés, puces tapables (`SubjectTag` + heure), `aria-pressed`, mirror léger de `WeekSchedule`
+- `components/homework/add-homework-fab.tsx` -- FAB + Dialog (`add-homework-fab.tsx:62`), `ScheduleSlotPicker` optionnel (n'apparaît que si l'utilisateur a des créneaux) à la place d'une liste déroulante de texte
 - `components/schedule/day-view.tsx` -- `DayView` (`day-view.tsx:37`) affiche les devoirs rattachés sous leur créneau, icône `NotebookPen`/`Check` selon `done`, matière du devoir précisée seulement si différente de celle du créneau
-- `app/(accueil)/page.tsx` -- fetch `listDevoirs`, construit `devoirsView` (échéance/jours-restants/créneau formatés serveur, AD-4) et `homeworkScheduleSlots` (via `formatSlotLabel`)
-- `app/edt/page.tsx` -- fetch `listDevoirs`, `attachDevoirsToSlots` pour "Aujourd'hui"/"Demain", `homeworkScheduleSlots` pour le FAB
+- `app/(accueil)/page.tsx` -- fetch `listDevoirs`, construit `devoirsView` (échéance/jours-restants/créneau formatés serveur, AD-4) ; passe `slots` brut (pas de libellé pré-formaté) au sélecteur du FAB
+- `app/edt/page.tsx` -- fetch `listDevoirs`, `attachDevoirsToSlots` pour "Aujourd'hui"/"Demain" ; passe `slots` brut au sélecteur du FAB
 
 ## Tasks & Acceptance
 
@@ -104,6 +104,8 @@ Changements de code : `markDevoirDone` re-devient `toggleDevoirDone(id, userId, 
 
 Vérification indépendante (relecture complète des fichiers changés + re-exécution locale de `npx vitest run`/`npx tsc --noEmit`/`npm run lint`/`npm run build` + test manuel dans le navigateur, 3 subagents de revue en parallèle par itération) menée séparément de la session d'implémentation, pour les deux itérations.
 
+**Itération 3 (retour utilisateur, raffinement UI) :** le sélecteur "Programmer dans l'EDT" (liste déroulante de texte, itération 1) jugé "pas assez visuel" -- remplacé par `components/homework/schedule-slot-picker.tsx`, une mini grille type EDT (jours groupés, puces tapables pastille+heure, mirror léger de `WeekSchedule`) plutôt qu'une liste. `AddHomeworkFabSlot` simplifié pour transporter le créneau brut (`{id, weekday, startTime, subject}`) au lieu d'un libellé pré-formaté -- `domain/schedule.ts::formatSlotLabel` (introduit en itération 2 pour factoriser ce libellé) devenu inutile, supprimé. Changement contenu à une nouvelle interaction déjà éprouvée ailleurs dans l'app (boutons `aria-pressed`, même pattern que les checklists) : revue solo plutôt qu'un nouveau cycle à 3 subagents, vérifié manuellement dans le navigateur (sélection/désélection d'un créneau confirmée).
+
 ## Design Notes
 
 FAB dupliqué (pas de layout partagé Accueil+EDT existant -- `app/layout.tsx` est le seul layout, commun à toutes les routes) plutôt qu'un wrapper client conditionnel sur `usePathname()` : plus simple, zéro risque de fuite sur d'autres routes (Réglages, Progression). `SubjectTag` documente déjà en commentaire être prévu pour les devoirs.
@@ -133,6 +135,11 @@ Lien EDT scopé à "Aujourd'hui"/"Demain" (pas "Semaine") pour rester dans le bu
 - `npx tsc --noEmit`, `npm run lint`, `npm run build` -- OK, aucune erreur, `/` et `/edt` toujours `ƒ (Dynamic)`.
 - Vérifié dans le navigateur (dev server + Browser pane) : devoir créé avec échéance + rattaché à un créneau -- affiche matière/échéance/jours-restants/créneau correctement sur Accueil ; tap coche (checkmark vert, texte barré) sans disparaître, tap à nouveau décoche -- bidirectionnel confirmé ; suppression retire définitivement la ligne (confirmé aussi en base) ; sur EDT, le devoir rattaché apparaît en lecture seule sous son créneau, avec préfixe matière quand celle-ci diffère du créneau (testé délibérément avec un devoir "Maths" rattaché à un créneau "EPS"), icône `NotebookPen`/`Check` selon l'état fait, style barré/atténué quand fait.
 
+**Résultats (itération 3, raffinement UI) :**
+- `npx vitest run` -- OK, 95/95 tests passent (aucun test affecté, changement purement présentationnel).
+- `npx tsc --noEmit`, `npm run lint`, `npm run build` -- OK, aucune erreur.
+- Vérifié dans le navigateur : mini grille type EDT affichée à l'ouverture du FAB (jours groupés, puces pastille+heure) ; tap sur une puce la sélectionne (fond violet, coche) et désélectionne "Aucun créneau" ; comportement de sélection/désélection confirmé visuellement.
+
 ## Suggested Review Order
 
 **Modèle de données**
@@ -147,9 +154,6 @@ Lien EDT scopé à "Aujourd'hui"/"Demain" (pas "Semaine") pour rester dans le bu
 
 - Regroupement devoirs-par-créneau, extrait et testé suite à la verification-gap review (itération 2).
   [`domain/homework.ts:57`](../../domain/homework.ts#L57)
-
-- Libellé de créneau factorisé (`formatSlotLabel`), corrige une duplication Accueil/EDT.
-  [`domain/schedule.ts:43`](../../domain/schedule.ts#L43)
 
 **Données & mutation**
 
@@ -176,9 +180,14 @@ Lien EDT scopé à "Aujourd'hui"/"Demain" (pas "Semaine") pour rester dans le bu
 - Devoir rattaché : icône lucide (pas d'emoji) + distinction visuelle fait/pas-fait + matière précisée si différente du créneau.
   [`day-view.tsx:86`](../../components/schedule/day-view.tsx#L86)
 
+**UI -- raffinement (itération 3, retour utilisateur)**
+
+- Mini grille type EDT remplaçant la liste déroulante de texte -- créneau brut en props, plus de libellé pré-formaté (`formatSlotLabel` supprimé).
+  [`schedule-slot-picker.tsx:30`](../../components/homework/schedule-slot-picker.tsx#L30)
+
 **Intégration pages**
 
-- Regroupement par créneau + libellés de créneau pour le FAB.
+- Regroupement par créneau pour l'affichage EDT + créneaux bruts pour le FAB.
   [`app/edt/page.tsx:82`](../../app/edt/page.tsx#L82)
 
 - Échéance/jours-restants/créneau formatés côté serveur (AD-4).
