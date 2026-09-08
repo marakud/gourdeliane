@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ensureSeedUser, setWeekAReferenceMonday } from "@/data/user";
+import { ensureSeedUser, setFirstName, setWeekAReferenceMonday } from "@/data/user";
 import { isWeekParity, mondayOfIso, shiftIsoDays } from "@/domain/schedule";
 import { getTodaySchoolDate, schoolDateToIso } from "@/domain/school-day";
 
@@ -72,5 +72,35 @@ export async function setCurrentWeekParity(
       ok: false,
       error: "Impossible d'enregistrer la semaine de référence. Réessaie.",
     };
+  }
+}
+
+// Même limite que components/settings/first-name-card.tsx (`maxLength` du
+// champ) -- revérifiée ici puisque les Server Actions sont joignables
+// directement, sans passer par le champ contraint côté client.
+const MAX_FIRST_NAME_LENGTH = 60;
+
+/**
+ * Enregistre le prénom affiché dans le message d'accueil ("Bonjour
+ * {firstName} !", app/(accueil)/page.tsx). Une chaîne vide efface le prénom
+ * (retour à "Bonjour !" sans nom) -- ce n'est pas une valeur requise.
+ */
+export async function setFirstNameAction(
+  firstName: string
+): Promise<ActionResult<null>> {
+  const trimmed = firstName.trim();
+  if (trimmed.length > MAX_FIRST_NAME_LENGTH) {
+    return { ok: false, error: `Le prénom ne peut pas dépasser ${MAX_FIRST_NAME_LENGTH} caractères.` };
+  }
+
+  try {
+    const user = await ensureSeedUser();
+    await setFirstName(user.id, trimmed.length > 0 ? trimmed : null);
+    revalidateReglages();
+    revalidateAccueil();
+    return { ok: true, data: null };
+  } catch (error) {
+    console.error("setFirstNameAction failed:", error);
+    return { ok: false, error: "Impossible d'enregistrer le prénom. Réessaie." };
   }
 }

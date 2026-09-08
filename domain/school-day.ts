@@ -13,7 +13,10 @@
 
 import { WEEKDAYS, type Weekday } from "./schedule";
 
-const SCHOOL_TIME_ZONE = "America/Guadeloupe";
+// Exporté pour les formatages d'affichage ponctuels qui ont besoin du même
+// fuseau sans dupliquer la chaîne littérale (ex. app/(accueil)/page.tsx --
+// message d'accueil avec date/heure).
+export const SCHOOL_TIME_ZONE = "America/Guadeloupe";
 
 /** Jour calendaire (pas d'heure, pas de fuseau) -- ex. 7 septembre 2026. */
 export interface SchoolDate {

@@ -13,10 +13,11 @@ import {
   createFixedChecklistItem,
   createRetourChecklistItem,
 } from "@/actions/checklist";
-import { setCurrentWeekParity } from "@/actions/settings";
+import { setCurrentWeekParity, setFirstNameAction } from "@/actions/settings";
 import { SubjectItemsManager } from "@/components/checklist/subject-items-manager";
 import { FixedItemsManager } from "@/components/checklist/fixed-items-manager";
 import { WeekParityCard } from "@/components/settings/week-parity-card";
+import { FirstNameCard } from "@/components/settings/first-name-card";
 
 export default async function ReglagesPage() {
   // Force le rendu dynamique à chaque requête (AGENTS.md -- modèle de cache
@@ -54,6 +55,8 @@ export default async function ReglagesPage() {
           les prochaines fois où cette matière a cours.
         </p>
       </div>
+
+      <FirstNameCard firstName={user.firstName} onSetFirstName={setFirstNameAction} />
 
       <WeekParityCard currentParity={currentParity} onSetParity={setCurrentWeekParity} />
 

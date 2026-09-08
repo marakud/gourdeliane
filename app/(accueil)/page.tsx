@@ -20,6 +20,7 @@ import {
   getTomorrowSchoolDate,
   schoolDateToIso,
   schoolDateToWeekday,
+  SCHOOL_TIME_ZONE,
 } from "@/domain/school-day";
 import {
   CHECKLIST_TYPE_MATIN,
@@ -54,6 +55,27 @@ function formatEcheanceLabel(echeanceIso: string): string {
     month: "short",
   });
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+/**
+ * Date + heure du message d'accueil, en America/Guadeloupe fixe (AD-4) --
+ * `now` est reçu en paramètre explicite (jamais lu en interne), même
+ * convention que domain/school-day.ts.
+ */
+function formatGreetingDateTime(now: Date): { dateLabel: string; timeLabel: string } {
+  const dateLabel = now.toLocaleDateString("fr-FR", {
+    timeZone: SCHOOL_TIME_ZONE,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const timeLabel = now.toLocaleTimeString("fr-FR", {
+    timeZone: SCHOOL_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return { dateLabel, timeLabel };
 }
 
 export default async function AccueilPage() {
@@ -238,19 +260,39 @@ export default async function AccueilPage() {
     colorIndex: subject.colorIndex,
   }));
 
+  // "Devoirs pour demain" (retour utilisateur) -- devoirs dont l'échéance
+  // tombe précisément demain, à côté du sac (bloc "Avant d'aller se
+  // coucher"). Purement informatif ici : cocher/éditer/supprimer reste
+  // réservé au bloc "Devoirs" plus bas (pas de double UI de mutation). Un
+  // devoir déjà fait est exclu (correctif de revue) : cette rubrique répond
+  // à "qu'est-ce qu'il me reste à préparer/faire ce soir ?", pas un
+  // historique -- sans ce filtre, un devoir fini restait affiché et pouvait
+  // même déclencher l'affichage de la carte un soir sans cours ni rien à
+  // faire (le message "Pas cours demain, profite de ta soirée !" ne
+  // s'affichait plus alors qu'il n'y avait plus rien à préparer).
+  const devoirsForTomorrow = devoirsView.filter(
+    (devoir) => devoir.echeanceIso === tomorrowIso && !devoir.done
+  );
+
+  const { dateLabel, timeLabel } = formatGreetingDateTime(now);
+
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-8">
       <div>
         <h1 className="font-heading text-3xl font-bold text-foreground">
-          Accueil
+          {user.firstName ? `Bonjour ${user.firstName} !` : "Bonjour !"}
         </h1>
         <p className="text-base text-muted-foreground">
-          Ce qu&apos;il te faut pour demain, préparé pour toi.
+          Nous sommes le {dateLabel}, il est {timeLabel}.
         </p>
       </div>
 
-      {sacGroups.length > 0 ? (
-        <SacChecklist groups={sacGroups} dateIso={tomorrowIso} />
+      {sacGroups.length > 0 || devoirsForTomorrow.length > 0 ? (
+        <SacChecklist
+          groups={sacGroups}
+          devoirsForTomorrow={devoirsForTomorrow}
+          dateIso={tomorrowIso}
+        />
       ) : (
         <p className="rounded-2xl bg-card px-4 py-8 text-center text-base text-muted-foreground ring-1 ring-border">
           Pas cours demain, profite de ta soirée !

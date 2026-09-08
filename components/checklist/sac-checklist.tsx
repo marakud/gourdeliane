@@ -6,11 +6,15 @@ import { SubjectTag } from "@/components/schedule/subject-tag";
 import { toggleChecklistItem } from "@/actions/checklist";
 import { cn } from "@/lib/utils";
 
-// Bloc "Sac pour demain" (Accueil, Story 2.1). Reçoit la checklist déjà
-// dérivée par domain/checklist.ts::deriveSacChecklist -- ce composant ne
-// recalcule rien, il affiche et coche/décoche via la Server Action
-// `toggleChecklistItem`, avec mise à jour optimiste (annulée si l'action
-// échoue) pour un retour immédiat au tap (UX-DR : animation < 300ms).
+// Bloc "Avant d'aller se coucher" (Accueil, Story 2.1, renommé/étendu retour
+// utilisateur pour aussi rappeler les devoirs à rendre demain). Reçoit la
+// checklist déjà dérivée par domain/checklist.ts::deriveSacChecklist -- ce
+// composant ne recalcule rien, il affiche et coche/décoche via la Server
+// Action `toggleChecklistItem`, avec mise à jour optimiste (annulée si
+// l'action échoue) pour un retour immédiat au tap (UX-DR : animation < 300ms).
+// `devoirsForTomorrow` est purement informatif (lecture seule) -- éditer/
+// cocher/supprimer un devoir reste réservé au bloc "Devoirs" plus bas sur la
+// page (pas de double UI de mutation pour la même donnée).
 
 export interface SacChecklistItem {
   sourceId: string;
@@ -23,15 +27,26 @@ export interface SacChecklistGroup {
   items: SacChecklistItem[];
 }
 
+export interface SacChecklistDevoir {
+  id: string;
+  description: string;
+  subject: { name: string; colorIndex: number };
+}
+
 export interface SacChecklistProps {
   groups: SacChecklistGroup[];
+  devoirsForTomorrow?: SacChecklistDevoir[];
   // Jour pour lequel la checklist est préparée ("demain"), ISO "yyyy-MM-dd"
   // -- transmis tel quel à la Server Action (AD-4 : déjà calculé côté
   // serveur par app/(accueil)/page.tsx, jamais recalculé ici).
   dateIso: string;
 }
 
-export function SacChecklist({ groups, dateIso }: SacChecklistProps) {
+export function SacChecklist({
+  groups,
+  devoirsForTomorrow = [],
+  dateIso,
+}: SacChecklistProps) {
   const [checkedById, setCheckedById] = useState<Record<string, boolean>>(
     () => {
       const initial: Record<string, boolean> = {};
@@ -92,7 +107,7 @@ export function SacChecklist({ groups, dateIso }: SacChecklistProps) {
           id="sac-heading"
           className="font-heading text-lg font-semibold text-foreground"
         >
-          Sac pour demain
+          Avant d&apos;aller se coucher
         </h2>
         {total > 0 && (
           <span className="text-sm font-medium text-muted-foreground">
@@ -101,7 +116,8 @@ export function SacChecklist({ groups, dateIso }: SacChecklistProps) {
         )}
       </div>
 
-      <ul className="flex flex-col gap-4">
+      {groups.length > 0 && (
+        <ul className="flex flex-col gap-4">
         {groups.map((group) => (
           <li key={group.subject.id} className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
@@ -171,7 +187,38 @@ export function SacChecklist({ groups, dateIso }: SacChecklistProps) {
             )}
           </li>
         ))}
-      </ul>
+        </ul>
+      )}
+
+      {devoirsForTomorrow.length > 0 && (
+        <div
+          className={cn(
+            "flex flex-col gap-2",
+            groups.length > 0 && "border-t border-border pt-3"
+          )}
+        >
+          <h3 className="text-sm font-semibold text-foreground">
+            Devoirs pour demain
+          </h3>
+          <ul className="flex flex-col gap-1.5">
+            {devoirsForTomorrow.map((devoir) => (
+              <li
+                key={devoir.id}
+                className="flex items-center gap-3 rounded-xl bg-muted px-3 py-2"
+              >
+                <SubjectTag
+                  name={devoir.subject.name}
+                  colorIndex={devoir.subject.colorIndex}
+                  className="size-7 text-[0.65rem]"
+                />
+                <span className="text-base text-foreground">
+                  {devoir.description}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

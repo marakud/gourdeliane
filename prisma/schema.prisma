@@ -20,6 +20,12 @@ model User {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
+  // Prénom affiché dans le message d'accueil ("Bonjour {firstName} !",
+  // app/(accueil)/page.tsx) -- optionnel, configuré depuis Réglages
+  // (actions/settings.ts::setFirstNameAction). `null` tant que non configuré :
+  // l'accueil affiche alors "Bonjour !" sans nom.
+  firstName String?
+
   // Semaine A/B (Story 1.4) : un lundi connu appartenant à la semaine A,
   // point de référence pour calculer la parité de n'importe quelle date
   // (domain/schedule.ts::computeWeekParity). `null` = alternance non

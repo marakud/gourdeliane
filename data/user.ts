@@ -30,3 +30,14 @@ export async function setWeekAReferenceMonday(userId: string, mondayUtc: Date) {
     data: { weekAReferenceMonday: mondayUtc },
   });
 }
+
+/**
+ * Enregistre le prénom affiché dans le message d'accueil. `null`/chaîne vide
+ * efface le prénom (retour à "Bonjour !" sans nom) -- pas une valeur requise.
+ */
+export async function setFirstName(userId: string, firstName: string | null) {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { firstName },
+  });
+}

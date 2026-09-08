@@ -4,27 +4,33 @@ import { prisma } from "../data/prisma";
 import { ensureSeedUser } from "../data/user";
 import { computeWeekParity } from "../domain/schedule";
 import { getTodaySchoolDate, schoolDateToIso } from "../domain/school-day";
-import { setCurrentWeekParity } from "./settings";
+import { setCurrentWeekParity, setFirstNameAction } from "./settings";
 
 // Tests d'intégration contre la vraie base de dev (SQLite) -- setCurrentWeekParity
-// agit sur User.weekAReferenceMonday, un champ singleton du seed user réel
-// (pas de userId synthétique possible ici, même contrainte qu'actions/checklist.test.ts).
-// La valeur d'origine est sauvegardée puis restaurée après coup pour ne pas
-// altérer l'état réel de l'app entre deux exécutions de la suite --
-// `fileParallelism: false` (vitest.config.ts) garantit qu'aucun autre fichier
-// de test ne touche ce même champ en même temps.
+// et setFirstNameAction agissent tous deux sur des champs singleton du seed
+// user réel (pas de userId synthétique possible ici, même contrainte
+// qu'actions/checklist.test.ts). Leurs valeurs d'origine sont sauvegardées
+// puis restaurées après coup pour ne pas altérer l'état réel de l'app entre
+// deux exécutions de la suite -- `fileParallelism: false` (vitest.config.ts)
+// garantit qu'aucun autre fichier de test ne touche ces mêmes champs en même
+// temps.
 let originalReference: Date | null = null;
+let originalFirstName: string | null = null;
 
 beforeAll(async () => {
   const user = await ensureSeedUser();
   originalReference = user.weekAReferenceMonday;
+  originalFirstName = user.firstName;
 });
 
 afterAll(async () => {
   const user = await ensureSeedUser();
   await prisma.user.update({
     where: { id: user.id },
-    data: { weekAReferenceMonday: originalReference },
+    data: {
+      weekAReferenceMonday: originalReference,
+      firstName: originalFirstName,
+    },
   });
   await prisma.$disconnect();
 });
@@ -68,6 +74,38 @@ describe("setCurrentWeekParity (Story 1.4)", () => {
     expect(result.ok).toBe(false);
 
     const after = (await ensureSeedUser()).weekAReferenceMonday?.toISOString();
+    expect(after).toBe(before);
+  });
+});
+
+describe("setFirstNameAction (retour utilisateur -- message d'accueil)", () => {
+  it("enregistre un prénom, trimmé", async () => {
+    const result = await setFirstNameAction("  Léa  ");
+    expect(result.ok).toBe(true);
+
+    const user = await ensureSeedUser();
+    expect(user.firstName).toBe("Léa");
+  });
+
+  it("efface le prénom quand la valeur est vide ou uniquement des espaces", async () => {
+    await setFirstNameAction("Léa");
+
+    const result = await setFirstNameAction("   ");
+    expect(result.ok).toBe(true);
+
+    const user = await ensureSeedUser();
+    expect(user.firstName).toBeNull();
+  });
+
+  it("rejette un prénom trop long sans toucher à la valeur existante", async () => {
+    await setFirstNameAction("Léa");
+    const before = (await ensureSeedUser()).firstName;
+
+    const tooLong = "a".repeat(61);
+    const result = await setFirstNameAction(tooLong);
+    expect(result.ok).toBe(false);
+
+    const after = (await ensureSeedUser()).firstName;
     expect(after).toBe(before);
   });
 });
