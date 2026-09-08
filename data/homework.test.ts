@@ -6,6 +6,7 @@ import {
   deleteDevoir,
   listDevoirs,
   toggleDevoirDone,
+  updateDevoir,
 } from "./homework";
 
 // Tests d'intégration contre la vraie base de dev (SQLite), même convention
@@ -109,6 +110,68 @@ describe("toggleDevoirDone -- bidirectionnel, scopé par (id, userId)", () => {
       where: { id: devoir.id },
     });
     expect(stillUnchecked?.done).toBe(false);
+  });
+});
+
+describe("updateDevoir -- modifie un devoir existant, scopé par (id, userId)", () => {
+  it("modifie tous les champs d'un devoir existant", async () => {
+    const devoir = await createDevoir(TEST_USER_ID, subjectId, "À modifier");
+    const echeance = new Date("2026-12-25T00:00:00Z");
+
+    const updated = await updateDevoir(
+      devoir.id,
+      TEST_USER_ID,
+      subjectId,
+      "Description modifiée",
+      true,
+      echeance,
+      "THURSDAY",
+      "16:00"
+    );
+
+    expect(updated.description).toBe("Description modifiée");
+    expect(updated.aRendre).toBe(true);
+    expect(updated.echeance?.toISOString()).toBe(echeance.toISOString());
+    expect(updated.plannedWeekday).toBe("THURSDAY");
+    expect(updated.plannedStartTime).toBe("16:00");
+  });
+
+  it("ne touche jamais à `done` (AD-7, réservé à toggleDevoirDone)", async () => {
+    const devoir = await createDevoir(TEST_USER_ID, subjectId, "Fait, à modifier");
+    await toggleDevoirDone(devoir.id, TEST_USER_ID, true);
+
+    const updated = await updateDevoir(
+      devoir.id,
+      TEST_USER_ID,
+      subjectId,
+      "Description modifiée sans toucher done",
+      false,
+      null,
+      null,
+      null
+    );
+
+    expect(updated.done).toBe(true);
+  });
+
+  it("rejette une modification scopée à un autre userId (protection {id, userId})", async () => {
+    const devoir = await createDevoir(TEST_USER_ID, subjectId, "Protégé3");
+
+    await expect(
+      updateDevoir(
+        devoir.id,
+        "un-autre-utilisateur",
+        subjectId,
+        "Modification non autorisée",
+        false,
+        null,
+        null,
+        null
+      )
+    ).rejects.toThrow();
+
+    const stillOriginal = await prisma.devoir.findUnique({ where: { id: devoir.id } });
+    expect(stillOriginal?.description).toBe("Protégé3");
   });
 });
 

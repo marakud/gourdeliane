@@ -2,12 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { ensureSeedUser } from "@/data/user";
-import { createDevoir, deleteDevoir, toggleDevoirDone } from "@/data/homework";
+import {
+  createDevoir,
+  deleteDevoir,
+  toggleDevoirDone,
+  updateDevoir,
+} from "@/data/homework";
 import {
   DEFAULT_FREE_WINDOW_END,
   DEFAULT_FREE_WINDOW_START,
   isWeekday,
   TIME_PATTERN,
+  type Weekday,
 } from "@/domain/schedule";
 
 // Toute mutation des devoirs passe par ce fichier (AD-1). Chaque action
@@ -95,19 +101,29 @@ function parseEcheance(
   return { ok: true, value: parsed };
 }
 
+interface ParsedDevoirInput {
+  subjectId: string;
+  description: string;
+  aRendre: boolean;
+  echeance: Date | null;
+  plannedWeekday: Weekday | null;
+  plannedStartTime: string | null;
+}
+
 /**
- * Crée un devoir depuis le FAB (Accueil ou EDT). Matière + description sont
- * les seuls champs obligatoires (Boundaries spec 2.4) -- "à rendre",
- * échéance et placement EDT restent optionnels, aucune validation ne les
- * rend requis. Le placement (jour+heure) n'est pas revérifié ici comme
+ * Valide/normalise un `DevoirFormInput`, partagé par `createDevoirAction` et
+ * `updateDevoirAction` (retour utilisateur -- édition, même règles que la
+ * création). Matière + description sont les seuls champs obligatoires
+ * (Boundaries spec 2.4) -- "à rendre", échéance et placement EDT restent
+ * optionnels. Le placement (jour+heure) n'est pas revérifié ici comme
  * "réellement dans un trou libre" (pas de requête sur `ScheduleSlot`) --
  * le sélecteur (`FreeTimePicker`, `domain/schedule.ts::computeWeeklyFreeGaps`)
  * ne propose déjà que des trous libres au moment de l'affichage. Seuls le
  * format et l'appartenance à la fenêtre 8h-22h sont vérifiés ici.
  */
-export async function createDevoirAction(
+function parseDevoirFormInput(
   input: DevoirFormInput
-): Promise<ActionResult<{ id: string }>> {
+): { ok: true; value: ParsedDevoirInput } | { ok: false; error: string } {
   const description = input.description.trim();
   if (description.length === 0) {
     return { ok: false, error: "La description est requise." };
@@ -139,19 +155,41 @@ export async function createDevoirAction(
       return { ok: false, error: "Horaire hors de la plage 8h-22h." };
     }
   }
-  const plannedWeekday = isWeekday(rawWeekday) ? rawWeekday : null;
-  const plannedStartTime = rawStartTime.length > 0 ? rawStartTime : null;
+
+  return {
+    ok: true,
+    value: {
+      subjectId: input.subjectId.trim(),
+      description,
+      aRendre: input.aRendre ?? false,
+      echeance: echeance.value,
+      plannedWeekday: isWeekday(rawWeekday) ? rawWeekday : null,
+      plannedStartTime: rawStartTime.length > 0 ? rawStartTime : null,
+    },
+  };
+}
+
+/**
+ * Crée un devoir depuis le FAB (Accueil ou EDT).
+ */
+export async function createDevoirAction(
+  input: DevoirFormInput
+): Promise<ActionResult<{ id: string }>> {
+  const parsed = parseDevoirFormInput(input);
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error };
+  }
 
   try {
     const user = await ensureSeedUser();
     const devoir = await createDevoir(
       user.id,
-      input.subjectId,
-      description,
-      input.aRendre ?? false,
-      echeance.value,
-      plannedWeekday,
-      plannedStartTime
+      parsed.value.subjectId,
+      parsed.value.description,
+      parsed.value.aRendre,
+      parsed.value.echeance,
+      parsed.value.plannedWeekday,
+      parsed.value.plannedStartTime
     );
     revalidateAccueil();
     revalidateEdt();
@@ -159,6 +197,45 @@ export async function createDevoirAction(
   } catch (error) {
     console.error("createDevoirAction failed:", error);
     return { ok: false, error: "Impossible d'ajouter le devoir. Réessaie." };
+  }
+}
+
+/**
+ * Modifie un devoir existant (retour utilisateur -- corriger une erreur de
+ * saisie sans passer par supprimer/recréer). Même validation que
+ * `createDevoirAction` (`parseDevoirFormInput`) ; `done` n'est jamais touché
+ * ici (AD-7, réservé à `toggleDevoirDoneAction`).
+ */
+export async function updateDevoirAction(
+  id: string,
+  input: DevoirFormInput
+): Promise<ActionResult<{ id: string }>> {
+  if (id.trim().length === 0) {
+    return { ok: false, error: "Devoir invalide." };
+  }
+  const parsed = parseDevoirFormInput(input);
+  if (!parsed.ok) {
+    return { ok: false, error: parsed.error };
+  }
+
+  try {
+    const user = await ensureSeedUser();
+    const devoir = await updateDevoir(
+      id,
+      user.id,
+      parsed.value.subjectId,
+      parsed.value.description,
+      parsed.value.aRendre,
+      parsed.value.echeance,
+      parsed.value.plannedWeekday,
+      parsed.value.plannedStartTime
+    );
+    revalidateAccueil();
+    revalidateEdt();
+    return { ok: true, data: { id: devoir.id } };
+  } catch (error) {
+    console.error("updateDevoirAction failed:", error);
+    return { ok: false, error: "Impossible de modifier le devoir. Réessaie." };
   }
 }
 

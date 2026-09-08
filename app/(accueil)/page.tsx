@@ -81,7 +81,7 @@ export default async function AccueilPage() {
     noSchoolDays.map((day) => day.date.toISOString().slice(0, 10))
   );
 
-  // "Demain" : calcul serveur en Europe/Paris fixe (AD-4), réutilisé tel
+  // "Demain" : calcul serveur en America/Guadeloupe fixe (AD-4), réutilisé tel
   // quel depuis domain/school-day.ts (Story 1.3) -- jamais recalculé
   // différemment ici (Boundaries de la spec 2.1).
   const now = new Date();
@@ -207,6 +207,7 @@ export default async function AccueilPage() {
       id: devoir.id,
       description: devoir.description,
       done: devoir.done,
+      aRendre: devoir.aRendre,
       subject: {
         id: devoir.subject.id,
         name: devoir.subject.name,
@@ -216,12 +217,17 @@ export default async function AccueilPage() {
       daysRemaining: echeanceIso
         ? computeDaysRemaining(echeanceIso, todayIso)
         : null,
+      echeanceIso,
       planned:
         devoir.plannedWeekday && devoir.plannedStartTime
           ? {
               weekday: WEEKDAY_LABELS[devoir.plannedWeekday as Weekday],
               startTime: devoir.plannedStartTime,
             }
+          : null,
+      plannedRaw:
+        devoir.plannedWeekday && devoir.plannedStartTime
+          ? { weekday: devoir.plannedWeekday, startTime: devoir.plannedStartTime }
           : null,
     };
   });
@@ -271,6 +277,8 @@ export default async function AccueilPage() {
         devoirs={devoirsView}
         onToggle={toggleDevoirDoneAction}
         onDelete={deleteDevoirAction}
+        subjects={homeworkSubjects}
+        scheduleSlots={slots}
       />
 
       <AddHomeworkFab subjects={homeworkSubjects} scheduleSlots={slots} />

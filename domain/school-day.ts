@@ -1,6 +1,11 @@
 // CartableFlow -- domain/school-day.ts (Story 1.3)
 //
-// Calcul pur d'"aujourd'hui" et "demain" en fuseau Europe/Paris fixe (AD-4).
+// Calcul pur d'"aujourd'hui" et "demain" en fuseau America/Guadeloupe fixe
+// (AD-4 -- corrigé après la Story 1.4 : le fuseau était codé Europe/Paris,
+// erroné pour une famille basée en Guadeloupe -- l'app pensait déjà être le
+// lendemain alors qu'il ne l'était pas encore localement). America/Guadeloupe
+// est un fuseau à décalage fixe (UTC-4, jamais d'heure d'été/hiver),
+// contrairement à Europe/Paris.
 // Aucune dépendance vers Next.js ou Prisma (AD-1 / domain/README.md) ; aucune
 // fonction ici ne lit l'horloge système -- `now: Date` est toujours reçu en
 // paramètre explicite par l'appelant (app/edt/page.tsx), pour rester
@@ -8,7 +13,7 @@
 
 import { WEEKDAYS, type Weekday } from "./schedule";
 
-const PARIS_TIME_ZONE = "Europe/Paris";
+const SCHOOL_TIME_ZONE = "America/Guadeloupe";
 
 /** Jour calendaire (pas d'heure, pas de fuseau) -- ex. 7 septembre 2026. */
 export interface SchoolDate {
@@ -19,11 +24,11 @@ export interface SchoolDate {
 
 // `en-CA` formate en "yyyy-MM-dd", pratique à parser -- seule la locale sert
 // de format, `timeZone` fait tout le travail de conversion depuis l'instant
-// UTC de `now` vers le jour calendaire réellement vécu à Paris (DST inclus,
-// géré par le moteur ICU sans jamais calculer un décalage à la main ici).
-function parisDateParts(now: Date): SchoolDate {
+// UTC de `now` vers le jour calendaire réellement vécu dans SCHOOL_TIME_ZONE
+// (géré par le moteur ICU sans jamais calculer un décalage à la main ici).
+function schoolDateParts(now: Date): SchoolDate {
   const formatter = new Intl.DateTimeFormat("en-CA", {
-    timeZone: PARIS_TIME_ZONE,
+    timeZone: SCHOOL_TIME_ZONE,
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -35,21 +40,21 @@ function parisDateParts(now: Date): SchoolDate {
   return { year, month, day };
 }
 
-/** Jour scolaire "aujourd'hui" à Paris pour l'instant `now` donné. */
+/** Jour scolaire "aujourd'hui" dans SCHOOL_TIME_ZONE pour l'instant `now` donné. */
 export function getTodaySchoolDate(now: Date): SchoolDate {
-  return parisDateParts(now);
+  return schoolDateParts(now);
 }
 
 /**
  * Jour calendaire suivant immédiat (pas le prochain jour avec cours, cf.
  * Design Notes de la spec 1.3). L'arithmétique se fait sur le triplet
- * année/mois/jour déjà résolu à Paris, via un instant UTC à midi (jamais
- * minuit, pour rester loin de toute frontière DST) -- ce n'est donc jamais
- * un "+24h" sur l'instant d'origine, qui se tromperait de jour calendaire
- * lors d'un changement d'heure.
+ * année/mois/jour déjà résolu dans SCHOOL_TIME_ZONE, via un instant UTC à
+ * midi (jamais minuit, pour rester loin de toute frontière de fuseau) -- ce
+ * n'est donc jamais un "+24h" sur l'instant d'origine, qui se tromperait de
+ * jour calendaire près d'une frontière de fuseau.
  */
 export function getTomorrowSchoolDate(now: Date): SchoolDate {
-  const today = parisDateParts(now);
+  const today = schoolDateParts(now);
   const nextDayUtcNoon = new Date(
     Date.UTC(today.year, today.month - 1, today.day, 12)
   );

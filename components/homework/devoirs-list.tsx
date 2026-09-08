@@ -1,9 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Trash2 } from "lucide-react";
+import { Check, Pencil, Trash2 } from "lucide-react";
 import type { ActionResult } from "@/actions/homework";
 import { SubjectTag } from "@/components/schedule/subject-tag";
+import {
+  HomeworkFormDialog,
+  type HomeworkFormDialogSlot,
+  type HomeworkFormDialogSubject,
+} from "@/components/homework/homework-form-dialog";
 import { cn } from "@/lib/utils";
 
 // Bloc "Devoirs" (Accueil, Story 2.4 -- retour utilisateur : contrairement à
@@ -17,14 +22,21 @@ export interface DevoirView {
   id: string;
   description: string;
   done: boolean;
+  aRendre: boolean;
   subject: { id: string; name: string; colorIndex: number };
   // Formatés côté serveur (app/(accueil)/page.tsx, AD-4) -- ce composant
   // n'a jamais à recalculer une date lui-même.
   echeanceLabel: string | null;
   daysRemaining: number | null;
+  // ISO "yyyy-MM-dd" brute (retour utilisateur -- édition), à côté
+  // d'`echeanceLabel` déjà formatée pour l'affichage.
+  echeanceIso: string | null;
   // Placement dans un trou libre de l'EDT (retour utilisateur Story 2.4,
-  // 2e itération) -- `weekday` déjà en libellé français (WEEKDAY_LABELS).
+  // 2e itération) -- `weekday` déjà en libellé français (WEEKDAY_LABELS)
+  // pour l'affichage ; `plannedRaw` porte le code Weekday brut ("MONDAY")
+  // nécessaire pour réinitialiser le FreeTimePicker en édition.
   planned: { weekday: string; startTime: string } | null;
+  plannedRaw: { weekday: string; startTime: string } | null;
 }
 
 export type ToggleDevoirDoneAction = (input: {
@@ -40,6 +52,10 @@ export interface DevoirsListProps {
   devoirs: DevoirView[];
   onToggle: ToggleDevoirDoneAction;
   onDelete: DeleteDevoirAction;
+  // Nécessaires pour le formulaire d'édition (retour utilisateur) -- mêmes
+  // données que celles déjà passées à AddHomeworkFab.
+  subjects: HomeworkFormDialogSubject[];
+  scheduleSlots?: HomeworkFormDialogSlot[];
 }
 
 function daysRemainingLabel(daysRemaining: number): string {
@@ -56,7 +72,13 @@ function doneMapFrom(devoirs: readonly { id: string; done: boolean }[]) {
   return map;
 }
 
-export function DevoirsList({ devoirs, onToggle, onDelete }: DevoirsListProps) {
+export function DevoirsList({
+  devoirs,
+  onToggle,
+  onDelete,
+  subjects,
+  scheduleSlots = [],
+}: DevoirsListProps) {
   // État coché en cours d'édition optimiste -- clé par id, initialisé depuis
   // les props puis mis à jour localement au tap, avant la réponse serveur.
   const [doneById, setDoneById] = useState<Record<string, boolean>>(() =>
@@ -230,6 +252,30 @@ export function DevoirsList({ devoirs, onToggle, onDelete }: DevoirsListProps) {
                       </span>
                     </div>
                   </button>
+                  <HomeworkFormDialog
+                    trigger={
+                      <button
+                        type="button"
+                        disabled={pendingIds.has(devoir.id)}
+                        aria-label={`Modifier ${devoir.description}`}
+                        className="flex size-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground disabled:opacity-60"
+                      >
+                        <Pencil aria-hidden="true" className="size-4" />
+                      </button>
+                    }
+                    subjects={subjects}
+                    scheduleSlots={scheduleSlots}
+                    onPendingChange={(pending) => setPending(devoir.id, pending)}
+                    devoir={{
+                      id: devoir.id,
+                      subjectId: devoir.subject.id,
+                      description: devoir.description,
+                      aRendre: devoir.aRendre,
+                      echeance: devoir.echeanceIso ?? "",
+                      plannedWeekday: devoir.plannedRaw?.weekday ?? "",
+                      plannedStartTime: devoir.plannedRaw?.startTime ?? "",
+                    }}
+                  />
                   <button
                     type="button"
                     onClick={() => handleDelete(devoir.id)}

@@ -59,7 +59,7 @@ graph LR
 
 - **Binds:** FR-2, FR-3, FR-19, FR-13
 - **Prevents:** une bascule "aujourd'hui/demain" incohérente entre deux appareils, ou près de minuit.
-- **Rule:** toute notion de jour scolaire, "demain", ou limite de moment (soir/matin/retour) se calcule côté serveur dans le fuseau `Europe/Paris`, jamais depuis l'heure locale du client.
+- **Rule:** toute notion de jour scolaire, "demain", ou limite de moment (soir/matin/retour) se calcule côté serveur dans le fuseau `America/Guadeloupe` (corrigé après la Story 1.4 -- codé `Europe/Paris` à tort avant, erroné pour une famille basée en Guadeloupe), jamais depuis l'heure locale du client.
 
 ### AD-5 — Le Streak se dérive, les Badges sont une fonction pure
 
@@ -90,7 +90,7 @@ graph LR
 | Concern | Convention |
 | --- | --- |
 | Naming (entités, fichiers) | Identifiants de code en anglais (`Subject`, `Homework`, `ChecklistItemState`, `DayCompletion`) même si le domaine produit est en français ; les libellés affichés restent en français (EXPERIENCE.md). |
-| Dates & jour scolaire | Dates stockées en UTC ; toute logique de "jour scolaire" resolue côté serveur en `Europe/Paris` (AD-4), jamais côté client. |
+| Dates & jour scolaire | Dates stockées en UTC ; toute logique de "jour scolaire" resolue côté serveur en `America/Guadeloupe` (AD-4), jamais côté client. |
 | Multi-tenance | Toute entité est scopée par `userId` dès v1, même si un seul utilisateur existe réellement — évite une migration structurelle quand la Vue Parent ou le multi-enfant arriveront. |
 | Mutation | Server Actions uniquement (AD-1) ; chaque action rappelle une fonction `domain/` pure pour toute règle de dérivation avant d'écrire via `data/`. |
 | Erreurs | Les Server Actions retournent un résultat typé `{ ok: true, data } \| { ok: false, error }` — pas d'exception non gérée remontée jusqu'à l'UI. |

@@ -6,6 +6,7 @@ import {
   createDevoirAction,
   deleteDevoirAction,
   toggleDevoirDoneAction,
+  updateDevoirAction,
 } from "./homework";
 
 // Tests d'intégration contre la vraie base de dev (SQLite). Comme
@@ -31,6 +32,12 @@ const TEST_DESCRIPTIONS = [
   "action-test-devoir-bad-weekday",
   "action-test-devoir-bad-time",
   "action-test-devoir-delete",
+  "action-test-devoir-update-before",
+  "action-test-devoir-update-after",
+  "action-test-devoir-update-done-preserved",
+  "action-test-devoir-update-done-preserved (modifié)",
+  "action-test-devoir-update-bad",
+  "action-test-devoir-update-empty-id",
 ];
 
 let subjectId: string;
@@ -233,6 +240,82 @@ describe("toggleDevoirDoneAction -- bidirectionnel, jamais supprimé (AD-7)", ()
 
   it("rejette un id vide", async () => {
     const result = await toggleDevoirDoneAction({ id: "", done: true });
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("updateDevoirAction -- modification (retour utilisateur)", () => {
+  it("modifie un devoir existant", async () => {
+    await ensureTestSubject();
+
+    const created = await createDevoirAction({
+      subjectId,
+      description: "action-test-devoir-update-before",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const updated = await updateDevoirAction(created.data.id, {
+      subjectId,
+      description: "action-test-devoir-update-after",
+      aRendre: true,
+      echeance: "2026-12-20",
+      plannedWeekday: "THURSDAY",
+      plannedStartTime: "16:00",
+    });
+    expect(updated.ok).toBe(true);
+
+    const devoir = await prisma.devoir.findUnique({ where: { id: created.data.id } });
+    expect(devoir?.description).toBe("action-test-devoir-update-after");
+    expect(devoir?.aRendre).toBe(true);
+    expect(devoir?.plannedWeekday).toBe("THURSDAY");
+    expect(devoir?.plannedStartTime).toBe("16:00");
+  });
+
+  it("ne touche jamais à `done` (AD-7, réservé à toggleDevoirDoneAction)", async () => {
+    await ensureTestSubject();
+
+    const created = await createDevoirAction({
+      subjectId,
+      description: "action-test-devoir-update-done-preserved",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    await toggleDevoirDoneAction({ id: created.data.id, done: true });
+
+    const updated = await updateDevoirAction(created.data.id, {
+      subjectId,
+      description: "action-test-devoir-update-done-preserved (modifié)",
+    });
+    expect(updated.ok).toBe(true);
+
+    const devoir = await prisma.devoir.findUnique({ where: { id: created.data.id } });
+    expect(devoir?.done).toBe(true);
+  });
+
+  it("rejette une description vide", async () => {
+    await ensureTestSubject();
+
+    const created = await createDevoirAction({
+      subjectId,
+      description: "action-test-devoir-update-bad",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const result = await updateDevoirAction(created.data.id, {
+      subjectId,
+      description: "   ",
+    });
+    expect(result.ok).toBe(false);
+  });
+
+  it("rejette un id vide", async () => {
+    const result = await updateDevoirAction("", {
+      subjectId,
+      description: "action-test-devoir-update-empty-id",
+    });
     expect(result.ok).toBe(false);
   });
 });

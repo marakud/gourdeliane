@@ -37,6 +37,37 @@ export async function createDevoir(
 }
 
 /**
+ * Modifie un devoir existant (retour utilisateur -- pouvoir corriger une
+ * erreur de saisie sans passer par supprimer/recréer). Mêmes champs que
+ * `createDevoir`, scopé par `{ id, userId }` -- même garde que
+ * `toggleDevoirDone`/`deleteDevoir`. `done` n'est jamais touché ici (reste
+ * réservé à `toggleDevoirDone`, AD-7).
+ */
+export async function updateDevoir(
+  id: string,
+  userId: string,
+  subjectId: string,
+  description: string,
+  aRendre: boolean,
+  echeance: Date | null,
+  plannedWeekday: Weekday | null,
+  plannedStartTime: string | null
+) {
+  return prisma.devoir.update({
+    where: { id, userId },
+    data: {
+      subjectId,
+      description,
+      aRendre,
+      echeance,
+      plannedWeekday,
+      plannedStartTime,
+    },
+    include: { subject: true },
+  });
+}
+
+/**
  * Bascule `done` d'un devoir (bidirectionnel -- retour utilisateur Story
  * 2.4 : un devoir fait reste affiché coché, jamais retiré de la liste ; le
  * child doit pouvoir le redécocher par erreur). Scopé par `{ id, userId }` --

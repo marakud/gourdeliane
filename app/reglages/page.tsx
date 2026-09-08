@@ -33,7 +33,7 @@ export default async function ReglagesPage() {
   ]);
 
   // Semaine A/B (Story 1.4) : la parité affichée porte sur AUJOURD'HUI
-  // (Europe/Paris, AD-4), calculée seulement si une référence existe déjà.
+  // (America/Guadeloupe, AD-4), calculée seulement si une référence existe déjà.
   const todayIso = schoolDateToIso(getTodaySchoolDate(new Date()));
   const weekAReferenceMondayIso = user.weekAReferenceMonday
     ? user.weekAReferenceMonday.toISOString().slice(0, 10)

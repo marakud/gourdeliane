@@ -46,7 +46,7 @@ export default async function EdtPage() {
   }));
   const noSchoolDayIsoSet = new Set(noSchoolDayDates.map((day) => day.date));
 
-  // "Aujourd'hui"/"Demain" : calcul serveur en Europe/Paris fixe (AD-4),
+  // "Aujourd'hui"/"Demain" : calcul serveur en America/Guadeloupe fixe (AD-4),
   // jamais depuis l'heure locale du client -- `now` est résolu une seule
   // fois ici et passé explicitement aux fonctions pures de domain/school-day.
   const now = new Date();

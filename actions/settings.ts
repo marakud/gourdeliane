@@ -37,7 +37,7 @@ function revalidateAccueil() {
 }
 
 /**
- * Déclare que la semaine calendaire en cours (calculée serveur, Europe/Paris,
+ * Déclare que la semaine calendaire en cours (calculée serveur, America/Guadeloupe,
  * AD-4) est la semaine A ou B -- dérive et enregistre `weekAReferenceMonday`
  * (un lundi appartenant à la semaine A) pour que `computeWeekParity` calcule
  * ensuite la parité de n'importe quelle date (Story 1.4). Ne touche jamais
