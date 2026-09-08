@@ -29,7 +29,9 @@ import { createDevoirAction, type DevoirFormInput } from "@/actions/homework";
 // conditionnel sur usePathname() (Design Notes). Formulaire mirror
 // `SlotFormDialog` (components/schedule/slot-form-dialog.tsx) : Dialog +
 // Select + Input, `useTransition`, ferme immédiatement au submit réussi
-// (Boundaries : "sans écran de confirmation").
+// (Boundaries : "sans écran de confirmation"). Sélecteur de créneau optionnel
+// ajouté suite au retour utilisateur Story 2.4 ("programmer le devoir dans
+// l'EDT" -- rattachement à un créneau existant, pas de nouvel horaire créé).
 
 export interface AddHomeworkFabSubject {
   id: string;
@@ -37,18 +39,30 @@ export interface AddHomeworkFabSubject {
   colorIndex: number;
 }
 
+export interface AddHomeworkFabSlot {
+  id: string;
+  label: string; // ex. "Maths -- jeudi 08:00"
+}
+
 export interface AddHomeworkFabProps {
   subjects: AddHomeworkFabSubject[];
+  scheduleSlots?: AddHomeworkFabSlot[];
 }
+
+const NO_SLOT_VALUE = "__none__";
 
 const EMPTY_FORM: DevoirFormInput = {
   subjectId: "",
   description: "",
   aRendre: false,
   echeance: "",
+  scheduleSlotId: "",
 };
 
-export function AddHomeworkFab({ subjects }: AddHomeworkFabProps) {
+export function AddHomeworkFab({
+  subjects,
+  scheduleSlots = [],
+}: AddHomeworkFabProps) {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<DevoirFormInput>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
@@ -178,6 +192,40 @@ export function AddHomeworkFab({ subjects }: AddHomeworkFabProps) {
               className="h-11 text-base"
             />
           </div>
+
+          {scheduleSlots.length > 0 && (
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="devoir-slot">
+                Programmer dans l&apos;EDT (optionnel)
+              </Label>
+              <Select
+                value={form.scheduleSlotId || NO_SLOT_VALUE}
+                onValueChange={(value) =>
+                  setForm((f) => ({
+                    ...f,
+                    scheduleSlotId: value === NO_SLOT_VALUE ? "" : (value as string),
+                  }))
+                }
+              >
+                <SelectTrigger id="devoir-slot" className="h-11 w-full text-base">
+                  <SelectValue>
+                    {(value: string | null) =>
+                      scheduleSlots.find((slot) => slot.id === value)?.label ??
+                      "Aucun créneau"
+                    }
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_SLOT_VALUE}>Aucun créneau</SelectItem>
+                  {scheduleSlots.map((slot) => (
+                    <SelectItem key={slot.id} value={slot.id}>
+                      {slot.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {error && (
             <p role="alert" className="text-sm font-medium text-destructive">

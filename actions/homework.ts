@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { ensureSeedUser } from "@/data/user";
-import { createDevoir, markDevoirDone } from "@/data/homework";
+import { createDevoir, deleteDevoir, toggleDevoirDone } from "@/data/homework";
 
 // Toute mutation des devoirs passe par ce fichier (AD-1). Chaque action
 // rappelle domain/homework.ts pour toute règle métier avant d'écrire via
@@ -31,11 +31,18 @@ function safeRevalidate(path: string) {
 
 function revalidateAccueil() {
   // app/(accueil)/page.tsx vit dans un groupe de routes -- son URL réelle
-  // est "/", pas "/(accueil)". Le bloc "Devoirs à faire" ne vit que sur
-  // Accueil (Code Map) : créer un devoir depuis le FAB de l'EDT doit quand
-  // même revalider Accueil pour que la ligne y apparaisse immédiatement à la
-  // prochaine navigation, sans écran de confirmation (Boundaries spec 2.4).
+  // est "/", pas "/(accueil)". Le bloc "Devoirs" ne vit que sur Accueil
+  // (Code Map) : créer/cocher/supprimer un devoir depuis le FAB de l'EDT
+  // doit quand même revalider Accueil pour que la ligne y apparaisse
+  // immédiatement à la prochaine navigation.
   safeRevalidate("/");
+}
+
+function revalidateEdt() {
+  // Un devoir peut être rattaché à un créneau EDT (scheduleSlotId, retour
+  // utilisateur Story 2.4) et s'y afficher -- toute mutation doit donc aussi
+  // revalider "/edt", pas seulement Accueil.
+  safeRevalidate("/edt");
 }
 
 export interface DevoirFormInput {
@@ -44,6 +51,9 @@ export interface DevoirFormInput {
   // Optionnels (Boundaries spec 2.4) : aucune validation ne les rend requis.
   aRendre?: boolean;
   echeance?: string; // ISO "yyyy-MM-dd", saisie via <input type="date">
+  // Rattachement optionnel à un créneau EDT existant (retour utilisateur
+  // Story 2.4, "programmer le devoir dans l'EDT").
+  scheduleSlotId?: string;
 }
 
 /**
@@ -78,8 +88,9 @@ function parseEcheance(
 
 /**
  * Crée un devoir depuis le FAB (Accueil ou EDT). Matière + description sont
- * les seuls champs obligatoires (Boundaries spec 2.4) -- "à rendre" et
- * échéance restent optionnels, aucune validation ne les rend requis.
+ * les seuls champs obligatoires (Boundaries spec 2.4) -- "à rendre",
+ * échéance et créneau EDT restent optionnels, aucune validation ne les rend
+ * requis.
  */
 export async function createDevoirAction(
   input: DevoirFormInput
@@ -95,6 +106,10 @@ export async function createDevoirAction(
   if (!echeance.ok) {
     return { ok: false, error: "Date d'échéance invalide." };
   }
+  const scheduleSlotId =
+    input.scheduleSlotId && input.scheduleSlotId.trim().length > 0
+      ? input.scheduleSlotId
+      : null;
 
   try {
     const user = await ensureSeedUser();
@@ -103,9 +118,11 @@ export async function createDevoirAction(
       input.subjectId,
       description,
       input.aRendre ?? false,
-      echeance.value
+      echeance.value,
+      scheduleSlotId
     );
     revalidateAccueil();
+    revalidateEdt();
     return { ok: true, data: { id: devoir.id } };
   } catch (error) {
     console.error("createDevoirAction failed:", error);
@@ -115,16 +132,14 @@ export async function createDevoirAction(
 
 export interface ToggleDevoirDoneInput {
   id: string;
+  done: boolean;
 }
 
 /**
- * Marque un devoir comme fait (tap sur une ligne de "Devoirs à faire",
- * I/O matrix spec 2.4). Contrairement à `toggleChecklistItem`
- * (actions/checklist.ts), ce n'est pas une bascule symétrique dans cette
- * story : le seul geste exposé par l'UI (`components/homework/devoirs-list.tsx`)
- * est "marquer fait" -- une fois retiré de "à faire", aucune ligne ne permet
- * de redécocher (Never de la spec : "seule la bascule done est mutable",
- * jamais d'autre édition). `done` est donc toujours écrit à `true` ici.
+ * Coche/décoche un devoir (tap sur une ligne de "Devoirs", retour
+ * utilisateur Story 2.4 -- bidirectionnel, contrairement à la première
+ * itération de cette story : le devoir reste affiché, coché, jamais retiré
+ * de la liste).
  */
 export async function toggleDevoirDoneAction(
   input: ToggleDevoirDoneInput
@@ -135,8 +150,9 @@ export async function toggleDevoirDoneAction(
 
   try {
     const user = await ensureSeedUser();
-    await markDevoirDone(input.id, user.id);
+    await toggleDevoirDone(input.id, user.id, input.done);
     revalidateAccueil();
+    revalidateEdt();
     return { ok: true, data: null };
   } catch (error) {
     console.error("toggleDevoirDoneAction failed:", error);
@@ -144,5 +160,35 @@ export async function toggleDevoirDoneAction(
       ok: false,
       error: "Impossible de mettre à jour le devoir. Réessaie.",
     };
+  }
+}
+
+export interface DeleteDevoirInput {
+  id: string;
+}
+
+/**
+ * Supprime définitivement un devoir (bouton "supprimer" avec icône, retour
+ * utilisateur Story 2.4). Contrairement à `toggleDevoirDoneAction`, c'est
+ * irréversible -- l'UI ne demande pas de confirmation, même convention que
+ * `deleteSlot`/`deleteFixedChecklistItem` (actions/schedule.ts,
+ * actions/checklist.ts).
+ */
+export async function deleteDevoirAction(
+  input: DeleteDevoirInput
+): Promise<ActionResult<null>> {
+  if (input.id.trim().length === 0) {
+    return { ok: false, error: "Devoir invalide." };
+  }
+
+  try {
+    const user = await ensureSeedUser();
+    await deleteDevoir(input.id, user.id);
+    revalidateAccueil();
+    revalidateEdt();
+    return { ok: true, data: null };
+  } catch (error) {
+    console.error("deleteDevoirAction failed:", error);
+    return { ok: false, error: "Impossible de supprimer le devoir. Réessaie." };
   }
 }

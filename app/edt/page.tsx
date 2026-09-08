@@ -1,9 +1,15 @@
 import { connection } from "next/server";
 import { ensureSeedUser } from "@/data/user";
 import { getScheduleForUser } from "@/data/schedule";
+import { listDevoirs } from "@/data/homework";
 import { EdtViewTabs } from "@/components/schedule/edt-view-tabs";
 import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
-import { deriveDaySlots, type Weekday } from "@/domain/schedule";
+import {
+  deriveDaySlots,
+  formatSlotLabel,
+  type Weekday,
+} from "@/domain/schedule";
+import { attachDevoirsToSlots } from "@/domain/homework";
 import {
   getTodaySchoolDate,
   getTomorrowSchoolDate,
@@ -67,6 +73,20 @@ export default async function EdtPage() {
     noSchoolDayIsoSet
   );
 
+  // Devoirs rattachés à un créneau (Story 2.4, retour utilisateur
+  // "programmer le devoir dans l'EDT") : affichage en lecture seule sous le
+  // créneau concerné dans "Aujourd'hui"/"Demain" -- cocher/supprimer reste
+  // réservé au bloc "Devoirs" d'Accueil (Code Map). `attachDevoirsToSlots`
+  // (domain/homework.ts, testé) fait le regroupement -- jamais recalculé ici.
+  const devoirs = await listDevoirs(user.id);
+  const todaySlotsWithDevoirs = attachDevoirsToSlots(todaySlots, devoirs);
+  const tomorrowSlotsWithDevoirs = attachDevoirsToSlots(tomorrowSlots, devoirs);
+
+  const homeworkScheduleSlots = slots.map((slot) => ({
+    id: slot.id,
+    label: formatSlotLabel(slot),
+  }));
+
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-8">
       <div>
@@ -79,11 +99,11 @@ export default async function EdtPage() {
       </div>
       <EdtViewTabs
         today={{
-          slots: todaySlots,
+          slots: todaySlotsWithDevoirs,
           emptyMessage: "Pas cours aujourd'hui, profite de ta journée !",
         }}
         tomorrow={{
-          slots: tomorrowSlots,
+          slots: tomorrowSlotsWithDevoirs,
           emptyMessage: "Pas cours demain, profite de ta soirée !",
         }}
         week={{
@@ -99,6 +119,7 @@ export default async function EdtPage() {
           name: subject.name,
           colorIndex: subject.colorIndex,
         }))}
+        scheduleSlots={homeworkScheduleSlots}
       />
     </div>
   );

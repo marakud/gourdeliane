@@ -7,7 +7,13 @@ import {
   listSubjectItemsForSubjects,
 } from "@/data/checklist";
 import { listDevoirs } from "@/data/homework";
-import { dedupeSubjectsFromSlots, deriveDaySlots, type Weekday } from "@/domain/schedule";
+import {
+  dedupeSubjectsFromSlots,
+  deriveDaySlots,
+  formatSlotLabel,
+  WEEKDAY_LABELS,
+  type Weekday,
+} from "@/domain/schedule";
 import {
   getTodaySchoolDate,
   getTomorrowSchoolDate,
@@ -24,16 +30,30 @@ import {
   deriveSacChecklist,
   type ChecklistSubjectGroupInput,
 } from "@/domain/checklist";
-import { filterDevoirsAFaire } from "@/domain/homework";
+import { computeDaysRemaining } from "@/domain/homework";
 import {
   toggleMatinChecklistItem,
   toggleRetourChecklistItem,
 } from "@/actions/checklist";
-import { toggleDevoirDoneAction } from "@/actions/homework";
+import { deleteDevoirAction, toggleDevoirDoneAction } from "@/actions/homework";
 import { SacChecklist } from "@/components/checklist/sac-checklist";
 import { FixedChecklist } from "@/components/checklist/fixed-checklist";
 import { DevoirsList } from "@/components/homework/devoirs-list";
 import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
+
+// Même technique que `formatFrenchDate`
+// (components/schedule/no-school-day-panel.tsx) : ancrage midi UTC pour
+// éviter tout décalage de fuseau à l'affichage, et capitalisation manuelle de
+// la seule première lettre (jamais la classe Tailwind `capitalize`, qui
+// capitaliserait chaque mot -- bug corrigé en Story 1.3).
+function formatEcheanceLabel(echeanceIso: string): string {
+  const date = new Date(`${echeanceIso}T12:00:00Z`);
+  const formatted = date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+  });
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
 
 export default async function AccueilPage() {
   // Force le rendu dynamique à chaque requête (AGENTS.md -- modèle de cache
@@ -160,25 +180,52 @@ export default async function AccueilPage() {
     }))
   );
 
-  // "Devoirs à faire" (Story 2.4) : bloc indépendant de l'EDT, toujours
-  // affiché (y compris vide -- contrairement au sac). `listDevoirs` renvoie
-  // faits + à faire, `filterDevoirsAFaire` (domain/homework.ts, AD-7) exclut
-  // les faits sans jamais les toucher en base.
+  // "Devoirs" (Story 2.4, retour utilisateur) : bloc indépendant de l'EDT,
+  // toujours affiché (y compris vide -- contrairement au sac). `listDevoirs`
+  // renvoie faits + à faire -- un devoir fait reste affiché (coché), plus
+  // jamais retiré de la liste par un filtre (Boundaries spec 2.4 amendée).
+  // Échéance/jours-restants formatés ici, côté serveur (AD-4) -- jamais
+  // recalculés côté client.
   const devoirs = await listDevoirs(user.id);
-  const devoirsAFaire = filterDevoirsAFaire(devoirs).map((devoir) => ({
-    id: devoir.id,
-    description: devoir.description,
-    subject: {
-      id: devoir.subject.id,
-      name: devoir.subject.name,
-      colorIndex: devoir.subject.colorIndex,
-    },
-  }));
+  const devoirsView = devoirs.map((devoir) => {
+    const echeanceIso = devoir.echeance
+      ? devoir.echeance.toISOString().slice(0, 10)
+      : null;
+    return {
+      id: devoir.id,
+      description: devoir.description,
+      done: devoir.done,
+      subject: {
+        id: devoir.subject.id,
+        name: devoir.subject.name,
+        colorIndex: devoir.subject.colorIndex,
+      },
+      echeanceLabel: echeanceIso ? formatEcheanceLabel(echeanceIso) : null,
+      daysRemaining: echeanceIso
+        ? computeDaysRemaining(echeanceIso, todayIso)
+        : null,
+      scheduleSlot: devoir.scheduleSlot
+        ? {
+            subjectName: devoir.subject.name,
+            weekday: WEEKDAY_LABELS[devoir.scheduleSlot.weekday as Weekday],
+            startTime: devoir.scheduleSlot.startTime,
+          }
+        : null,
+    };
+  });
 
   const homeworkSubjects = subjects.map((subject) => ({
     id: subject.id,
     name: subject.name,
     colorIndex: subject.colorIndex,
+  }));
+
+  // Créneaux existants proposés dans le sélecteur "Programmer dans l'EDT" du
+  // FAB (retour utilisateur Story 2.4) -- même liste que celle déjà chargée
+  // pour l'EDT, reformatée en libellé lisible.
+  const homeworkScheduleSlots = slots.map((slot) => ({
+    id: slot.id,
+    label: formatSlotLabel(slot),
   }));
 
   return (
@@ -216,9 +263,16 @@ export default async function AccueilPage() {
         onToggle={toggleRetourChecklistItem}
       />
 
-      <DevoirsList devoirs={devoirsAFaire} onComplete={toggleDevoirDoneAction} />
+      <DevoirsList
+        devoirs={devoirsView}
+        onToggle={toggleDevoirDoneAction}
+        onDelete={deleteDevoirAction}
+      />
 
-      <AddHomeworkFab subjects={homeworkSubjects} />
+      <AddHomeworkFab
+        subjects={homeworkSubjects}
+        scheduleSlots={homeworkScheduleSlots}
+      />
     </div>
   );
 }

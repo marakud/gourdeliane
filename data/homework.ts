@@ -1,56 +1,71 @@
 import { prisma } from "./prisma";
 
-// Story 2.4 -- accès aux données des devoirs : création, bascule "fait",
-// listing. Toute logique de dérivation (filtrer "à faire") vit dans
-// domain/homework.ts, jamais ici.
+// Story 2.4 (+ amendement retour utilisateur) -- accès aux données des
+// devoirs : création (avec rattachement optionnel à un créneau EDT), bascule
+// "fait" (bidirectionnelle), suppression, listing. Toute logique de
+// dérivation vit dans domain/homework.ts, jamais ici.
 
 /**
- * Crée un devoir. `aRendre`/`echeance` restent optionnels (Boundaries spec
- * 2.4 : seules matière + description sont obligatoires, validées en amont
- * par actions/homework.ts) -- `done` démarre toujours à `false` (défaut du
- * schéma), aucun devoir ne peut être créé déjà fait.
+ * Crée un devoir. `aRendre`/`echeance`/`scheduleSlotId` restent optionnels
+ * (Boundaries spec 2.4 : seules matière + description sont obligatoires,
+ * validées en amont par actions/homework.ts) -- `done` démarre toujours à
+ * `false` (défaut du schéma), aucun devoir ne peut être créé déjà fait.
  */
 export async function createDevoir(
   userId: string,
   subjectId: string,
   description: string,
   aRendre: boolean = false,
-  echeance: Date | null = null
+  echeance: Date | null = null,
+  scheduleSlotId: string | null = null
 ) {
   return prisma.devoir.create({
-    data: { userId, subjectId, description, aRendre, echeance },
-    include: { subject: true },
+    data: { userId, subjectId, description, aRendre, echeance, scheduleSlotId },
+    include: { subject: true, scheduleSlot: true },
   });
 }
 
 /**
- * Marque un devoir fait. Scopé par `{ id, userId }` -- même garde que
- * `updateSubjectItem`/`updateFixedChecklistItem` (data/checklist.ts:237-246,
- * 200-209) -- pour ne jamais laisser un appel mettre à jour le devoir d'un
- * autre utilisateur. Écrit toujours `done: true` : le Never de la spec 2.4
- * ("seule la bascule done est mutable", jamais d'autre édition) n'expose
- * aucun geste de "redécocher" dans cette story -- pas de paramètre `done`
- * ici pour ne pas laisser un futur appel réintroduire silencieusement cette
- * capacité côté données.
+ * Bascule `done` d'un devoir (bidirectionnel -- retour utilisateur Story
+ * 2.4 : un devoir fait reste affiché coché, jamais retiré de la liste ; le
+ * child doit pouvoir le redécocher par erreur). Scopé par `{ id, userId }` --
+ * même garde que `updateSubjectItem`/`updateFixedChecklistItem`
+ * (data/checklist.ts:237-246, 200-209) -- pour ne jamais laisser un appel
+ * mettre à jour le devoir d'un autre utilisateur.
  */
-export async function markDevoirDone(id: string, userId: string) {
+export async function toggleDevoirDone(
+  id: string,
+  userId: string,
+  done: boolean
+) {
   return prisma.devoir.update({
     where: { id, userId },
-    data: { done: true },
+    data: { done },
   });
 }
 
 /**
- * Liste tous les devoirs d'un utilisateur (faits et à faire -- le filtre
- * "à faire" est appliqué par domain/homework.ts::filterDevoirsAFaire, jamais
- * ici), avec leur matière pour l'affichage (pastille de couleur, SubjectTag).
- * `orderBy: createdAt asc` fixe l'ordre "reçu" que domain/homework.ts
- * préserve tel quel (pas de tri par urgence, Boundaries spec 2.4).
+ * Supprime définitivement un devoir (retour utilisateur Story 2.4 : bouton
+ * "supprimer" avec icône). Scopé par `{ id, userId }`, même garde que les
+ * autres mutations de ce fichier.
+ */
+export async function deleteDevoir(id: string, userId: string) {
+  return prisma.devoir.delete({
+    where: { id, userId },
+  });
+}
+
+/**
+ * Liste tous les devoirs d'un utilisateur (faits et à faire -- les deux
+ * restent affichés dans "Devoirs", Boundaries spec 2.4 amendée), avec leur
+ * matière (pastille de couleur, SubjectTag) et leur créneau EDT rattaché le
+ * cas échéant. `orderBy: createdAt asc` fixe l'ordre "reçu", préservé tel
+ * quel par l'appelant (pas de tri par urgence, Boundaries spec 2.4).
  */
 export async function listDevoirs(userId: string) {
   return prisma.devoir.findMany({
     where: { userId },
-    include: { subject: true },
+    include: { subject: true, scheduleSlot: true },
     orderBy: { createdAt: "asc" },
   });
 }

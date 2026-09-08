@@ -88,6 +88,11 @@ model ScheduleSlot {
   endTime   String
   createdAt DateTime @default(now())
 
+  // Devoirs rattachés à ce créneau (Story 2.4) -- via Devoir.scheduleSlotId,
+  // `onDelete: SetNull` côté Devoir : supprimer un créneau ne supprime
+  // jamais le devoir associé (AD-7), il perd juste son rattachement.
+  devoirs Devoir[]
+
   @@index([userId, weekday])
 }
 
@@ -197,20 +202,26 @@ model FixedChecklistDefaultsSeed {
 // AD-7 -- `done` ne suit PAS le cycle de réinitialisation quotidien de
 // `ChecklistItemState` (AD-3) : il ne change que par tap explicite de
 // l'enfant (actions/homework.ts::toggleDevoirDoneAction), jamais par une
-// tâche planifiée. Un devoir fait n'est simplement plus rendu dans "Devoirs
-// à faire" (domain/homework.ts::filterDevoirsAFaire) -- il n'est jamais
-// supprimé de cette table, même après plusieurs jours (Never de la spec).
+// tâche planifiée. Un devoir fait reste affiché (coché) dans "Devoirs" tant
+// qu'il n'est pas supprimé explicitement (actions/homework.ts::deleteDevoirAction)
+// -- jamais purgé automatiquement (Never de la spec).
 model Devoir {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subjectId   String
-  subject     Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  description String
-  aRendre     Boolean   @default(false)
-  echeance    DateTime?
-  done        Boolean   @default(false)
-  createdAt   DateTime  @default(now())
+  id            String       @id @default(cuid())
+  userId        String
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId     String
+  subject       Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  description   String
+  aRendre       Boolean      @default(false)
+  echeance      DateTime?
+  done          Boolean      @default(false)
+  createdAt     DateTime     @default(now())
+  // Créneau EDT auquel ce devoir est rattaché (optionnel -- "programmer le
+  // devoir dans l'EDT", retour utilisateur Story 2.4). `SetNull` (pas
+  // `Cascade`) : supprimer le créneau ne doit jamais supprimer le devoir
+  // (AD-7, "jamais supprimé"), seulement le délier.
+  scheduleSlotId String?
+  scheduleSlot   ScheduleSlot? @relation(fields: [scheduleSlotId], references: [id], onDelete: SetNull)
 
   @@index([userId, done])
 }
