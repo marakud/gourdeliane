@@ -7,12 +7,16 @@ import {
   DEFAULT_MATIN_ITEMS,
   DEFAULT_RETOUR_ITEMS,
 } from "@/domain/checklist";
+import { computeWeekParity } from "@/domain/schedule";
+import { getTodaySchoolDate, schoolDateToIso } from "@/domain/school-day";
 import {
   createFixedChecklistItem,
   createRetourChecklistItem,
 } from "@/actions/checklist";
+import { setCurrentWeekParity } from "@/actions/settings";
 import { SubjectItemsManager } from "@/components/checklist/subject-items-manager";
 import { FixedItemsManager } from "@/components/checklist/fixed-items-manager";
+import { WeekParityCard } from "@/components/settings/week-parity-card";
 
 export default async function ReglagesPage() {
   // Force le rendu dynamique à chaque requête (AGENTS.md -- modèle de cache
@@ -28,6 +32,16 @@ export default async function ReglagesPage() {
     listFixedChecklistItems(user.id, CHECKLIST_TYPE_RETOUR, DEFAULT_RETOUR_ITEMS),
   ]);
 
+  // Semaine A/B (Story 1.4) : la parité affichée porte sur AUJOURD'HUI
+  // (Europe/Paris, AD-4), calculée seulement si une référence existe déjà.
+  const todayIso = schoolDateToIso(getTodaySchoolDate(new Date()));
+  const weekAReferenceMondayIso = user.weekAReferenceMonday
+    ? user.weekAReferenceMonday.toISOString().slice(0, 10)
+    : null;
+  const currentParity = weekAReferenceMondayIso
+    ? computeWeekParity(todayIso, weekAReferenceMondayIso)
+    : null;
+
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-8">
       <div>
@@ -40,6 +54,8 @@ export default async function ReglagesPage() {
           les prochaines fois où cette matière a cours.
         </p>
       </div>
+
+      <WeekParityCard currentParity={currentParity} onSetParity={setCurrentWeekParity} />
 
       <SubjectItemsManager
         subjects={subjects.map((subject) => ({

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { validateSlot, type Weekday } from "@/domain/schedule";
+import { isWeekParity, validateSlot, type Weekday } from "@/domain/schedule";
 import { ensureSeedUser } from "@/data/user";
 import {
   createScheduleSlot,
@@ -26,6 +26,8 @@ export interface SlotFormInput {
   startTime: string;
   endTime: string;
   subjectName: string;
+  // Story 1.4 -- "" = toutes les semaines, sinon "A"/"B".
+  weekParity?: string;
 }
 
 // `revalidatePath` exige un contexte de requête Next.js valide -- appelé en
@@ -64,14 +66,25 @@ export async function createSlot(
     return { ok: false, error: validation.error };
   }
 
+  const weekParity =
+    input.weekParity && isWeekParity(input.weekParity) ? input.weekParity : null;
+
   try {
     const user = await ensureSeedUser();
+    if (weekParity && !user.weekAReferenceMonday) {
+      return {
+        ok: false,
+        error:
+          "Configure d'abord la semaine de référence dans Réglages avant de choisir une semaine A ou B.",
+      };
+    }
     const slot = await createScheduleSlot({
       userId: user.id,
       weekday: input.weekday as Weekday,
       startTime: input.startTime,
       endTime: input.endTime,
       subjectName: input.subjectName.trim(),
+      weekParity,
     });
     revalidateEdt();
     revalidateAccueil();
@@ -94,8 +107,18 @@ export async function updateSlot(
     return { ok: false, error: validation.error };
   }
 
+  const weekParity =
+    input.weekParity && isWeekParity(input.weekParity) ? input.weekParity : null;
+
   try {
     const user = await ensureSeedUser();
+    if (weekParity && !user.weekAReferenceMonday) {
+      return {
+        ok: false,
+        error:
+          "Configure d'abord la semaine de référence dans Réglages avant de choisir une semaine A ou B.",
+      };
+    }
     const slot = await updateScheduleSlot({
       id,
       userId: user.id,
@@ -103,6 +126,7 @@ export async function updateSlot(
       startTime: input.startTime,
       endTime: input.endTime,
       subjectName: input.subjectName.trim(),
+      weekParity,
     });
     revalidateEdt();
     revalidateAccueil();

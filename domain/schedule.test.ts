@@ -3,8 +3,11 @@ import {
   assignNextColorIndex,
   computeFreeGaps,
   computeWeeklyFreeGaps,
+  computeWeekParity,
   dedupeSubjectsFromSlots,
   deriveDaySlots,
+  mondayOfIso,
+  shiftIsoDays,
   validateSlot,
   type DaySlot,
   type SubjectRef,
@@ -78,6 +81,22 @@ describe("validateSlot (I/O matrix spec 1.2)", () => {
     const result = validateSlot({ ...base, subjectName: "   " });
     expect(result.valid).toBe(false);
   });
+
+  it("accepts a valid slot with weekParity A or B (Story 1.4)", () => {
+    expect(validateSlot({ ...base, weekParity: "A" })).toEqual({ valid: true });
+    expect(validateSlot({ ...base, weekParity: "B" })).toEqual({ valid: true });
+  });
+
+  it("accepts a slot with weekParity omitted, empty, or null (toutes les semaines)", () => {
+    expect(validateSlot(base)).toEqual({ valid: true });
+    expect(validateSlot({ ...base, weekParity: "" })).toEqual({ valid: true });
+    expect(validateSlot({ ...base, weekParity: null })).toEqual({ valid: true });
+  });
+
+  it("rejects an invalid weekParity value (Story 1.4)", () => {
+    const result = validateSlot({ ...base, weekParity: "C" });
+    expect(result.valid).toBe(false);
+  });
 });
 
 describe("deriveDaySlots (I/O matrix spec 1.3)", () => {
@@ -116,6 +135,87 @@ describe("deriveDaySlots (I/O matrix spec 1.3)", () => {
       new Set(["2026-09-08"])
     );
     expect(result.map((s) => s.id)).toEqual(["2", "1"]);
+  });
+});
+
+describe("deriveDaySlots -- filtrage par parité (Story 1.4)", () => {
+  const maths: DaySlot["subject"] = { name: "Maths", colorIndex: 1 };
+  const parityMixedSlots: DaySlot[] = [
+    { id: "all-weeks", weekday: "MONDAY", startTime: "08:00", endTime: "09:00", subject: maths },
+    {
+      id: "week-a",
+      weekday: "MONDAY",
+      startTime: "10:00",
+      endTime: "11:00",
+      weekParity: "A",
+      subject: maths,
+    },
+    {
+      id: "week-b",
+      weekday: "MONDAY",
+      startTime: "10:00",
+      endTime: "11:00",
+      weekParity: "B",
+      subject: maths,
+    },
+  ];
+
+  it("does not filter by parity when the 5th argument is omitted (rétrocompatibilité)", () => {
+    const result = deriveDaySlots(parityMixedSlots, "MONDAY", "2026-09-07", new Set());
+    expect(result.map((s) => s.id)).toEqual(["all-weeks", "week-a", "week-b"]);
+  });
+
+  it("keeps only every-week slots plus the matching parity", () => {
+    const result = deriveDaySlots(parityMixedSlots, "MONDAY", "2026-09-07", new Set(), "A");
+    expect(result.map((s) => s.id)).toEqual(["all-weeks", "week-a"]);
+  });
+
+  it("keeps only every-week slots when the reference isn't configured (parity null)", () => {
+    const result = deriveDaySlots(parityMixedSlots, "MONDAY", "2026-09-07", new Set(), null);
+    expect(result.map((s) => s.id)).toEqual(["all-weeks"]);
+  });
+});
+
+describe("mondayOfIso / shiftIsoDays / computeWeekParity (Story 1.4)", () => {
+  it("returns the date itself when it already is a Monday", () => {
+    expect(mondayOfIso("2026-09-07")).toBe("2026-09-07");
+  });
+
+  it("returns the Monday of the same calendar week for a later weekday", () => {
+    expect(mondayOfIso("2026-09-09")).toBe("2026-09-07");
+  });
+
+  it("returns the previous Monday for a Sunday", () => {
+    expect(mondayOfIso("2026-09-13")).toBe("2026-09-07");
+  });
+
+  it("shifts an ISO date forward and backward across a month boundary", () => {
+    expect(shiftIsoDays("2026-09-07", -7)).toBe("2026-08-31");
+    expect(shiftIsoDays("2026-08-31", 7)).toBe("2026-09-07");
+  });
+
+  it("computes A for a date in the reference week itself", () => {
+    expect(computeWeekParity("2026-09-09", "2026-09-07")).toBe("A");
+  });
+
+  it("computes B for the week right after the reference week", () => {
+    expect(computeWeekParity("2026-09-14", "2026-09-07")).toBe("B");
+  });
+
+  it("computes A again two weeks after the reference week", () => {
+    expect(computeWeekParity("2026-09-21", "2026-09-07")).toBe("A");
+  });
+
+  it("computes B for a week before the reference week (negative offset)", () => {
+    expect(computeWeekParity("2026-08-31", "2026-09-07")).toBe("B");
+  });
+
+  it("gives today and tomorrow different parities across a week boundary (dimanche -> lundi)", () => {
+    const today = computeWeekParity("2026-09-13", "2026-09-07"); // dimanche, semaine A
+    const tomorrow = computeWeekParity("2026-09-14", "2026-09-07"); // lundi, semaine B
+    expect(today).toBe("A");
+    expect(tomorrow).toBe("B");
+    expect(today).not.toBe(tomorrow);
   });
 });
 

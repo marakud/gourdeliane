@@ -1,5 +1,5 @@
 import { prisma } from "./prisma";
-import { assignNextColorIndex, type Weekday } from "@/domain/schedule";
+import { assignNextColorIndex, type WeekParity, type Weekday } from "@/domain/schedule";
 import type { Prisma } from "@prisma/client";
 
 /**
@@ -44,6 +44,7 @@ export interface CreateSlotData {
   startTime: string;
   endTime: string;
   subjectName: string;
+  weekParity: WeekParity | null;
 }
 
 /**
@@ -63,6 +64,7 @@ export async function createScheduleSlot(data: CreateSlotData) {
         weekday: data.weekday,
         startTime: data.startTime,
         endTime: data.endTime,
+        weekParity: data.weekParity,
       },
       include: { subject: true },
     });
@@ -76,6 +78,7 @@ export interface UpdateSlotData {
   startTime: string;
   endTime: string;
   subjectName: string;
+  weekParity: WeekParity | null;
 }
 
 /**
@@ -95,6 +98,7 @@ export async function updateScheduleSlot(data: UpdateSlotData) {
         weekday: data.weekday,
         startTime: data.startTime,
         endTime: data.endTime,
+        weekParity: data.weekParity,
       },
       include: { subject: true },
     });

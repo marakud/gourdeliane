@@ -32,6 +32,7 @@ describe("findOrCreateSubject (via createScheduleSlot) -- reuse insensible à la
       startTime: "08:00",
       endTime: "09:00",
       subjectName: "Maths",
+      weekParity: null,
     });
 
     const second = await createScheduleSlot({
@@ -40,6 +41,7 @@ describe("findOrCreateSubject (via createScheduleSlot) -- reuse insensible à la
       startTime: "10:00",
       endTime: "11:00",
       subjectName: "maths",
+      weekParity: null,
     });
 
     expect(second.subject.id).toBe(first.subject.id);

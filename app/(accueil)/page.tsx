@@ -8,9 +8,11 @@ import {
 } from "@/data/checklist";
 import { listDevoirs } from "@/data/homework";
 import {
+  computeWeekParity,
   dedupeSubjectsFromSlots,
   deriveDaySlots,
   WEEKDAY_LABELS,
+  type WeekParity,
   type Weekday,
 } from "@/domain/schedule";
 import {
@@ -71,6 +73,7 @@ export default async function AccueilPage() {
     weekday: slot.weekday as Weekday,
     startTime: slot.startTime,
     endTime: slot.endTime,
+    weekParity: slot.weekParity as WeekParity | null,
     subject: { name: slot.subject.name, colorIndex: slot.subject.colorIndex },
   }));
 
@@ -86,11 +89,21 @@ export default async function AccueilPage() {
   const tomorrowIso = schoolDateToIso(tomorrowDate);
   const tomorrowWeekday = schoolDateToWeekday(tomorrowDate);
 
+  // Semaine A/B (Story 1.4) : parité de "demain" précisément, cf.
+  // app/edt/page.tsx pour le même calcul appliqué à "aujourd'hui".
+  const weekAReferenceMondayIso = user.weekAReferenceMonday
+    ? user.weekAReferenceMonday.toISOString().slice(0, 10)
+    : null;
+  const tomorrowParity = weekAReferenceMondayIso
+    ? computeWeekParity(tomorrowIso, weekAReferenceMondayIso)
+    : null;
+
   const tomorrowSlots = deriveDaySlots(
     slots,
     tomorrowWeekday,
     tomorrowIso,
-    noSchoolDayIsoSet
+    noSchoolDayIsoSet,
+    tomorrowParity
   );
 
   // Matières ayant cours demain, dédupliquées (une matière peut avoir

@@ -26,7 +26,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { WEEKDAYS, WEEKDAY_LABELS, type Weekday } from "@/domain/schedule";
+import {
+  WEEKDAYS,
+  WEEKDAY_LABELS,
+  type WeekParity,
+  type Weekday,
+} from "@/domain/schedule";
 import { createSlot, updateSlot, type SlotFormInput } from "@/actions/schedule";
 
 export interface SlotFormDialogProps {
@@ -39,6 +44,7 @@ export interface SlotFormDialogProps {
     startTime: string;
     endTime: string;
     subjectName: string;
+    weekParity: WeekParity | null;
   };
   // Pré-remplit le jour à la création depuis la colonne où l'enfant a tapé
   // "Ajouter" -- évite de le resélectionner à chaque créneau.
@@ -50,7 +56,29 @@ const EMPTY_FORM: SlotFormInput = {
   startTime: "08:00",
   endTime: "09:00",
   subjectName: "",
+  weekParity: "",
 };
+
+// Story 1.4 -- Radix Select n'autorise pas la valeur "" pour un SelectItem
+// (réservée à "aucune sélection") : "ALL" sert de valeur sentinelle pour
+// "toutes les semaines", convertie en "" dans le form state à la volée.
+const WEEK_PARITY_ALL_VALUE = "ALL";
+
+function toFormInput(
+  slot: SlotFormDialogProps["slot"],
+  defaultWeekday?: Weekday
+): SlotFormInput {
+  if (!slot) {
+    return { ...EMPTY_FORM, weekday: defaultWeekday ?? EMPTY_FORM.weekday };
+  }
+  return {
+    weekday: slot.weekday,
+    startTime: slot.startTime,
+    endTime: slot.endTime,
+    subjectName: slot.subjectName,
+    weekParity: slot.weekParity ?? "",
+  };
+}
 
 export function SlotFormDialog({
   trigger,
@@ -60,9 +88,7 @@ export function SlotFormDialog({
 }: SlotFormDialogProps) {
   const isEdit = Boolean(slot);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<SlotFormInput>(
-    slot ?? { ...EMPTY_FORM, weekday: defaultWeekday ?? EMPTY_FORM.weekday }
-  );
+  const [form, setForm] = useState<SlotFormInput>(toFormInput(slot, defaultWeekday));
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const datalistId = useId();
@@ -71,7 +97,7 @@ export function SlotFormDialog({
     setOpen(nextOpen);
     if (nextOpen) {
       setError(null);
-      setForm(slot ?? { ...EMPTY_FORM, weekday: defaultWeekday ?? EMPTY_FORM.weekday });
+      setForm(toFormInput(slot, defaultWeekday));
     }
   }
 
@@ -149,6 +175,36 @@ export function SlotFormDialog({
                     {WEEKDAY_LABELS[day]}
                   </SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="slot-week-parity">Cette matière a lieu</Label>
+            <Select
+              value={form.weekParity || WEEK_PARITY_ALL_VALUE}
+              onValueChange={(value) =>
+                setForm((f) => ({
+                  ...f,
+                  weekParity: value === WEEK_PARITY_ALL_VALUE ? "" : (value as string),
+                }))
+              }
+            >
+              <SelectTrigger id="slot-week-parity" className="h-11 w-full text-base">
+                <SelectValue>
+                  {(value: string | null) =>
+                    value === "A"
+                      ? "Semaine A"
+                      : value === "B"
+                        ? "Semaine B"
+                        : "Toutes les semaines"
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={WEEK_PARITY_ALL_VALUE}>Toutes les semaines</SelectItem>
+                <SelectItem value="A">Semaine A</SelectItem>
+                <SelectItem value="B">Semaine B</SelectItem>
               </SelectContent>
             </Select>
           </div>

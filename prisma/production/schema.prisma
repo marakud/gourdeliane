@@ -22,6 +22,13 @@ model User {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
+  // Semaine A/B (Story 1.4) : un lundi connu appartenant à la semaine A,
+  // point de référence pour calculer la parité de n'importe quelle date
+  // (domain/schedule.ts::computeWeekParity). `null` = alternance non
+  // configurée -- un ScheduleSlot "Semaine A"/"Semaine B" ne peut alors pas
+  // être créé (actions/schedule.ts).
+  weekAReferenceMonday DateTime?
+
   subjects                    Subject[]
   scheduleSlots               ScheduleSlot[]
   noSchoolDays                NoSchoolDay[]
@@ -32,9 +39,7 @@ model User {
   devoirs                     Devoir[]
 }
 
-// Jour de la semaine d'un créneau récurrent. Pas d'alternance A/B (PRD
-// confirmé, Deferred par l'architecture) : un créneau vaut pour toutes les
-// semaines, identifié uniquement par ce jour + horaire, jamais par une date.
+// Jour de la semaine d'un créneau récurrent.
 enum Weekday {
   MONDAY
   TUESDAY
@@ -43,6 +48,16 @@ enum Weekday {
   FRIDAY
   SATURDAY
   SUNDAY
+}
+
+// Parité d'alternance semaine A/B (Story 1.4, remplace la décision "pas
+// d'alternance A/B" de la Story 1.2 -- demandé explicitement par
+// l'utilisateur). Un ScheduleSlot.weekParity = null vaut pour toutes les
+// semaines (comportement historique) ; "A"/"B" ne vaut que les semaines de
+// cette parité, calculée depuis User.weekAReferenceMonday.
+enum WeekParity {
+  A
+  B
 }
 
 // Une matière. `colorIndex` est assigné une fois pour toutes à la création
@@ -66,10 +81,12 @@ model Subject {
   @@unique([userId, name])
 }
 
-// Un créneau hebdomadaire récurrent (jour + horaire + matière), identique
-// chaque semaine -- pas de date, pas d'alternance A/B. Horaires stockés en
-// String "HH:mm" (tri lexicographique correct dans ce format) : il n'y a pas
-// de notion de date pour un créneau récurrent (voir Design Notes spec 1.2).
+// Un créneau hebdomadaire récurrent (jour + horaire + matière). Horaires
+// stockés en String "HH:mm" (tri lexicographique correct dans ce format) :
+// il n'y a pas de notion de date pour un créneau récurrent (voir Design
+// Notes spec 1.2). `weekParity` (Story 1.4) restreint optionnellement un
+// créneau à une seule semaine d'alternance -- `null` vaut pour toutes les
+// semaines (comportement historique).
 //
 // Décision d'implémentation (I/O matrix spec 1.2, "Suppression d'une matière
 // avec créneaux") : suppression en cascade -- supprimer une Subject supprime
@@ -78,15 +95,16 @@ model Subject {
 // est exposée) ; ce choix garde l'intégrité référentielle simple pour le
 // jour où une telle UI arrivera (Réglages, epics suivants).
 model ScheduleSlot {
-  id        String   @id @default(cuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subjectId String
-  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  weekday   Weekday
-  startTime String
-  endTime   String
-  createdAt DateTime @default(now())
+  id         String      @id @default(cuid())
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId  String
+  subject    Subject     @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  weekday    Weekday
+  startTime  String
+  endTime    String
+  weekParity WeekParity?
+  createdAt  DateTime    @default(now())
 
   @@index([userId, weekday])
 }

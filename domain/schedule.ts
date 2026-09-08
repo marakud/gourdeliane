@@ -34,6 +34,77 @@ export function isWeekday(value: string): value is Weekday {
   return (WEEKDAYS as readonly string[]).includes(value);
 }
 
+// Alternance semaine A/B (Story 1.4) : un ScheduleSlot avec weekParity =
+// null vaut pour toutes les semaines (comportement historique, Story 1.2) ;
+// "A"/"B" ne vaut que les semaines de cette parité.
+export type WeekParity = "A" | "B";
+
+export function isWeekParity(value: string): value is WeekParity {
+  return value === "A" || value === "B";
+}
+
+export const WEEK_PARITY_LABELS: Record<WeekParity, string> = {
+  A: "Sem. A",
+  B: "Sem. B",
+};
+
+// Expansion accessible de WEEK_PARITY_LABELS (badge abrégé) -- lue par les
+// lecteurs d'écran et affichée en `title` au survol (components/schedule/slot-row.tsx).
+export const WEEK_PARITY_FULL_LABELS: Record<WeekParity, string> = {
+  A: "Semaine A",
+  B: "Semaine B",
+};
+
+function isoToUtcNoonMs(dateIso: string): number {
+  const [year, month, day] = dateIso.split("-").map(Number);
+  return Date.UTC(year, month - 1, day, 12);
+}
+
+function utcNoonMsToIso(ms: number): string {
+  const d = new Date(ms);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * Lundi (ISO "yyyy-MM-dd") de la semaine calendaire contenant `dateIso`.
+ * Ancrage midi UTC (même technique que domain/school-day.ts) pour rester
+ * loin de toute frontière de fuseau -- exportée pour actions/settings.ts
+ * (Story 1.4).
+ */
+export function mondayOfIso(dateIso: string): string {
+  const noonMs = isoToUtcNoonMs(dateIso);
+  const jsWeekday = new Date(noonMs).getUTCDay(); // 0=dimanche..6=samedi
+  const mondayOffsetDays = (jsWeekday + 6) % 7; // 0=lundi..6=dimanche
+  return utcNoonMsToIso(noonMs - mondayOffsetDays * 86_400_000);
+}
+
+/** Décale `dateIso` de `days` jours calendaires (peut être négatif). */
+export function shiftIsoDays(dateIso: string, days: number): string {
+  return utcNoonMsToIso(isoToUtcNoonMs(dateIso) + days * 86_400_000);
+}
+
+/**
+ * Calcule si `dateIso` tombe en semaine A ou B, à partir d'un lundi connu
+ * appartenant à la semaine A (`weekAReferenceMondayIso`, User.weekAReferenceMonday)
+ * -- Story 1.4. Pure, ancrée sur le lundi de chaque semaine (jamais la date
+ * brute) pour que toute date de la même semaine calendaire renvoie la même
+ * parité. Le nombre de semaines d'écart peut être négatif (date antérieure à
+ * la référence) -- le modulo est ramené dans [0, 2) pour rester correct.
+ */
+export function computeWeekParity(
+  dateIso: string,
+  weekAReferenceMondayIso: string
+): WeekParity {
+  const targetMondayMs = isoToUtcNoonMs(mondayOfIso(dateIso));
+  const refMondayMs = isoToUtcNoonMs(mondayOfIso(weekAReferenceMondayIso));
+  const diffWeeks = Math.round((targetMondayMs - refMondayMs) / (7 * 86_400_000));
+  const mod = ((diffWeeks % 2) + 2) % 2;
+  return mod === 0 ? "A" : "B";
+}
+
 // Palette catégorielle subject-1 à subject-8 (DESIGN.md), cyclique au-delà.
 const SUBJECT_COLOR_COUNT = 8;
 
@@ -66,6 +137,8 @@ export interface ScheduleSlotInput {
   startTime: string;
   endTime: string;
   subjectName: string;
+  // Story 1.4 -- "" ou absent = toutes les semaines, sinon "A"/"B".
+  weekParity?: string | null;
 }
 
 export type SlotValidationResult =
@@ -106,6 +179,10 @@ export function validateSlot(input: ScheduleSlotInput): SlotValidationResult {
     };
   }
 
+  if (input.weekParity && !isWeekParity(input.weekParity)) {
+    return { valid: false, error: "Parité de semaine invalide." };
+  }
+
   return { valid: true };
 }
 
@@ -114,6 +191,9 @@ export interface DaySlot {
   weekday: Weekday;
   startTime: string;
   endTime: string;
+  // Story 1.4 -- absent/null = toutes les semaines. Optionnel pour rester
+  // compatible avec les fixtures de test antérieures à cette story.
+  weekParity?: WeekParity | null;
   subject: { name: string; colorIndex: number };
 }
 
@@ -125,12 +205,22 @@ export interface DaySlot {
  * annule les cours de ce jour-là, cf. spec 1.3 I/O matrix). Pure : ne
  * distingue pas "sans cours explicite" de "aucun créneau saisi ce jour-là" --
  * les deux produisent une liste vide, à l'appelant de choisir le message.
+ *
+ * `weekParity` (Story 1.4, 5e paramètre optionnel -- signature à 4
+ * arguments inchangée pour rester rétrocompatible) : quand fourni (y
+ * compris `null`, ex. référence non configurée), ne garde que les créneaux
+ * "toutes les semaines" (weekParity absent/null) plus ceux de cette parité
+ * exacte. Omis (`undefined`), aucun filtrage par parité n'est appliqué.
+ * L'appelant doit calculer la parité de CETTE `dateIso` précisément (jamais
+ * réutiliser une parité "du jour" pour "demain" -- cf. Boundaries spec 1.4,
+ * un changement de semaine peut tomber entre les deux).
  */
 export function deriveDaySlots(
   allSlots: readonly DaySlot[],
   weekday: Weekday,
   dateIso: string,
-  noSchoolDayIsoSet: ReadonlySet<string>
+  noSchoolDayIsoSet: ReadonlySet<string>,
+  weekParity?: WeekParity | null
 ): DaySlot[] {
   if (noSchoolDayIsoSet.has(dateIso)) {
     return [];
@@ -138,6 +228,11 @@ export function deriveDaySlots(
 
   return allSlots
     .filter((slot) => slot.weekday === weekday)
+    .filter((slot) =>
+      weekParity === undefined
+        ? true
+        : slot.weekParity == null || slot.weekParity === weekParity
+    )
     .sort((a, b) => a.startTime.localeCompare(b.startTime));
 }
 

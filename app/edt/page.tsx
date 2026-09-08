@@ -4,7 +4,7 @@ import { getScheduleForUser } from "@/data/schedule";
 import { listDevoirs } from "@/data/homework";
 import { EdtViewTabs } from "@/components/schedule/edt-view-tabs";
 import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
-import { deriveDaySlots, type Weekday } from "@/domain/schedule";
+import { computeWeekParity, deriveDaySlots, type WeekParity, type Weekday } from "@/domain/schedule";
 import { filterDevoirsForWeekday } from "@/domain/homework";
 import {
   getTodaySchoolDate,
@@ -33,6 +33,7 @@ export default async function EdtPage() {
     weekday: slot.weekday as Weekday,
     startTime: slot.startTime,
     endTime: slot.endTime,
+    weekParity: slot.weekParity as WeekParity | null,
     subject: { name: slot.subject.name, colorIndex: slot.subject.colorIndex },
   }));
 
@@ -56,17 +57,34 @@ export default async function EdtPage() {
   const todayWeekday = schoolDateToWeekday(todayDate);
   const tomorrowWeekday = schoolDateToWeekday(tomorrowDate);
 
+  // Semaine A/B (Story 1.4) : la parité est calculée séparément pour
+  // aujourd'hui et demain -- jamais réutilisée telle quelle, un changement
+  // de semaine peut tomber entre les deux (ex. aujourd'hui dimanche, demain
+  // lundi). `null` (référence non configurée) ne filtre que les créneaux
+  // "toutes les semaines" (cf. deriveDaySlots).
+  const weekAReferenceMondayIso = user.weekAReferenceMonday
+    ? user.weekAReferenceMonday.toISOString().slice(0, 10)
+    : null;
+  const todayParity = weekAReferenceMondayIso
+    ? computeWeekParity(todayIso, weekAReferenceMondayIso)
+    : null;
+  const tomorrowParity = weekAReferenceMondayIso
+    ? computeWeekParity(tomorrowIso, weekAReferenceMondayIso)
+    : null;
+
   const todaySlots = deriveDaySlots(
     slots,
     todayWeekday,
     todayIso,
-    noSchoolDayIsoSet
+    noSchoolDayIsoSet,
+    todayParity
   );
   const tomorrowSlots = deriveDaySlots(
     slots,
     tomorrowWeekday,
     tomorrowIso,
-    noSchoolDayIsoSet
+    noSchoolDayIsoSet,
+    tomorrowParity
   );
 
   // Devoirs programmés dans un trou libre (Story 2.4, retour utilisateur

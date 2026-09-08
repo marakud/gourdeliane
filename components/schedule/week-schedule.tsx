@@ -6,13 +6,14 @@ import { Button } from "@/components/ui/button";
 import { SlotRow } from "@/components/schedule/slot-row";
 import { SlotFormDialog } from "@/components/schedule/slot-form-dialog";
 import { NoSchoolDayPanel } from "@/components/schedule/no-school-day-panel";
-import { WEEKDAYS, WEEKDAY_LABELS, type Weekday } from "@/domain/schedule";
+import { WEEKDAYS, WEEKDAY_LABELS, type WeekParity, type Weekday } from "@/domain/schedule";
 
 export interface WeekScheduleSlot {
   id: string;
   weekday: Weekday;
   startTime: string;
   endTime: string;
+  weekParity: WeekParity | null;
   subject: { name: string; colorIndex: number };
 }
 
@@ -54,7 +55,14 @@ export function WeekSchedule({
           sans jamais retomber sous le plancher de tap de 44px. */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-[repeat(auto-fill,minmax(160px,1fr))]">
         {WEEKDAYS.map((day) => {
-          const daySlots = slotsByDay.get(day) ?? [];
+          // Tri stable horaire puis parité (Story 1.4) : désambiguïse deux
+          // matières au même jour+horaire (semaine A puis B), ordre
+          // déterministe même si le backend renvoie un ordre différent.
+          const daySlots = [...(slotsByDay.get(day) ?? [])].sort((a, b) => {
+            const byTime = a.startTime.localeCompare(b.startTime);
+            if (byTime !== 0) return byTime;
+            return (a.weekParity ?? "").localeCompare(b.weekParity ?? "");
+          });
           return (
             <section
               key={day}

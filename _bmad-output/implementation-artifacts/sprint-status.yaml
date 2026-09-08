@@ -35,10 +35,11 @@ project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
 development_status:
-  epic-1: done
+  epic-1: in-progress
   1-1-initialisation-du-projet-et-premier-déploiement: done
   1-2-gérer-mon-emploi-du-temps: done
   1-3-voir-ma-journée-et-mon-lendemain: done
+  1-4-alterner-mes-semaines-a-et-b: review
   epic-1-retrospective: optional
 
   epic-2: in-progress

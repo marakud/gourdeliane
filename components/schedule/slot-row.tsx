@@ -6,7 +6,12 @@ import { Button } from "@/components/ui/button";
 import { SubjectTag } from "@/components/schedule/subject-tag";
 import { SlotFormDialog } from "@/components/schedule/slot-form-dialog";
 import { deleteSlot } from "@/actions/schedule";
-import type { Weekday } from "@/domain/schedule";
+import {
+  WEEK_PARITY_FULL_LABELS,
+  WEEK_PARITY_LABELS,
+  type WeekParity,
+  type Weekday,
+} from "@/domain/schedule";
 
 export interface SlotRowProps {
   slot: {
@@ -14,6 +19,7 @@ export interface SlotRowProps {
     weekday: Weekday;
     startTime: string;
     endTime: string;
+    weekParity: WeekParity | null;
     subject: { name: string; colorIndex: number };
   };
   existingSubjectNames: string[];
@@ -43,6 +49,15 @@ export function SlotRow({ slot, existingSubjectNames, onError }: SlotRowProps) {
           {slot.startTime} – {slot.endTime}
         </span>
       </div>
+      {slot.weekParity && (
+        <span
+          title={WEEK_PARITY_FULL_LABELS[slot.weekParity]}
+          className="shrink-0 rounded-md bg-accent px-2 py-0.5 text-xs font-medium text-accent-foreground"
+        >
+          <span aria-hidden="true">{WEEK_PARITY_LABELS[slot.weekParity]}</span>
+          <span className="sr-only">{WEEK_PARITY_FULL_LABELS[slot.weekParity]}</span>
+        </span>
+      )}
       <SlotFormDialog
         trigger={
           <Button
@@ -62,6 +77,7 @@ export function SlotRow({ slot, existingSubjectNames, onError }: SlotRowProps) {
           startTime: slot.startTime,
           endTime: slot.endTime,
           subjectName: slot.subject.name,
+          weekParity: slot.weekParity,
         }}
       />
       <Button
