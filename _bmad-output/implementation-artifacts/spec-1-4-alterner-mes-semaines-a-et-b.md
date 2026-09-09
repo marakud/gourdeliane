@@ -2,7 +2,7 @@
 title: 'Story 1.4 — Alterner mes semaines A et B'
 type: 'feature'
 created: '2026-09-08'
-status: 'review'
+status: 'done'
 review_loop_iteration: 1
 context: []
 baseline_commit: '54c40df0b371823746d77cdaf6fb63b668d16b1'
@@ -114,6 +114,7 @@ Le calcul de parité (`domain/schedule.ts::computeWeekParity`) ancre la comparai
 - `npx vitest run` -- OK, 134/134 tests passent (11 fichiers), incluant `computeWeekParity`/`mondayOfIso`/`shiftIsoDays`/filtrage par parité de `deriveDaySlots` (nouveaux, `domain/schedule.test.ts`), les cas `weekParity` de `validateSlot`, et deux nouveaux fichiers d'intégration (`actions/schedule.test.ts`, `actions/settings.test.ts`) ajoutés en revue pour couvrir le garde-fou "référence requise" et `setCurrentWeekParity`.
 - Revue adversariale à 3 couches (blind-hunter, edge-case-hunter, verification-gap) en parallèle sur le diff complet -- voir Spec Change Log pour le détail des correctifs appliqués et des pistes déférées.
 - Vérifié dans le navigateur (`npm run dev`) : création d'un créneau "Semaine A" et d'un créneau "Semaine B" au même jour+horaire (Lundi 08:00, Mardi 08:00) -- les deux coexistent en vue Semaine avec étiquette "Sem. A"/"Sem. B" désambiguïsante ; "Aujourd'hui" (mardi, semaine A déclarée dans Réglages) n'affiche que le créneau de parité A et exclut correctement celui de parité B au même horaire ; la carte Réglages affiche "Cette semaine est la semaine A" après un clic sur le bouton correspondant.
+- Confirmé en production par l'utilisateur ("ca marche") après déploiement, en même temps que les correctifs/fonctionnalités des commits suivants (fuseau horaire America/Guadeloupe, édition d'un devoir, message d'accueil).
 
 ## Suggested Review Order
 

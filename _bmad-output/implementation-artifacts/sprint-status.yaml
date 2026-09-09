@@ -29,24 +29,24 @@
 # - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
 # - Retrospective appends its action items to action_items; the status view surfaces open ones
 generated: 09-02-2026 20:26
-last_updated: 09-07-2026
+last_updated: 09-08-2026
 project: college-6eme
 project_key: NOKEY
 tracking_system: file-system
 story_location: _bmad-output/implementation-artifacts
 development_status:
-  epic-1: in-progress
+  epic-1: done
   1-1-initialisation-du-projet-et-premier-déploiement: done
   1-2-gérer-mon-emploi-du-temps: done
   1-3-voir-ma-journée-et-mon-lendemain: done
-  1-4-alterner-mes-semaines-a-et-b: review
+  1-4-alterner-mes-semaines-a-et-b: done
   epic-1-retrospective: optional
 
   epic-2: in-progress
   2-1-voir-et-personnaliser-mon-sac-du-soir: done
   2-2-cocher-mes-routines-fixes-du-matin: done
   2-3-cocher-mes-routines-fixes-du-retour: done
-  2-4-noter-et-suivre-mes-devoirs: review
+  2-4-noter-et-suivre-mes-devoirs: done
   2-5-lier-un-devoir-à-rendre-à-mon-sac-du-lendemain: backlog
   2-6-revoir-mes-cours-du-jour: backlog
   2-7-voir-ma-soirée-organisée-en-3-blocs-et-savoir-quand-elle-est: backlog
