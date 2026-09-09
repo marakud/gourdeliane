@@ -222,6 +222,87 @@ export function deriveSacChecklist(
   }));
 }
 
+// Story 2.6 -- bloc "Révisions du jour" (FR-19) : un rappel "Revoir le cours
+// de {matière}" par matière suivie AUJOURD'HUI (pas demain, contrairement au
+// Sac). `sourceId` = `Subject.id` directement -- pas de nouvelle entité
+// "item de révision" à créer/configurer depuis Réglages, contrairement à
+// SubjectItem/FixedChecklistItem (Boundaries spec 2.6 : texte non
+// personnalisable).
+export const CHECKLIST_TYPE_REVISIONS = "REVISIONS" as const;
+export const CHECKLIST_SOURCE_TYPE_SUBJECT = "SUBJECT" as const;
+
+/** Une matière suivie aujourd'hui, telle que résolue par
+ * domain/schedule.ts::dedupeSubjectsFromSlots. */
+export interface RevisionSubjectInput {
+  id: string;
+  name: string;
+  colorIndex: number;
+}
+
+/** Un item "Révisions du jour" dérivé -- étend `DerivedChecklistItem` avec la
+ * matière complète (id/name/colorIndex), nécessaire à l'affichage de la
+ * pastille de matière par ligne (contrairement à Matin/Retour, dont les items
+ * sont génériques et sans matière). */
+export interface DerivedRevisionItem extends DerivedChecklistItem {
+  subject: { id: string; name: string; colorIndex: number };
+}
+
+// Élision "de" -> "d'" devant une voyelle ou un h muet (ex. "Anglais", "EPS",
+// "Histoire") -- sans quoi le libellé généré serait grammaticalement fautif
+// ("Revoir le cours de Anglais"), même souci que `buildDevoirARendreLabel`
+// ci-dessus pour le texte généré côté devoirs.
+function withDePrefix(name: string): string {
+  const trimmed = name.trim();
+  const first = trimmed.charAt(0).toLocaleLowerCase("fr-FR");
+  const elides = "aeiouyàâäéèêëîïôöùûü".includes(first) || first === "h";
+  return elides ? `d'${trimmed}` : `de ${trimmed}`;
+}
+
+/**
+ * Dérive la checklist "Révisions du jour" (Story 2.6, FR-19) : un item par
+ * matière suivie aujourd'hui (liste plate, comme Matin/Retour -- pas de
+ * groupement puisqu'il n'y a jamais qu'un seul item par matière), croisé avec
+ * l'état coché existant, keyé par `sourceId` = `Subject.id` (jamais par
+ * libellé, AD-3) et filtré sur `sourceType = CHECKLIST_SOURCE_TYPE_SUBJECT`
+ * (même mécanisme que `deriveFixedChecklist`).
+ *
+ * Comportements couverts (I/O matrix spec 2.6) :
+ * - une matière suivie aujourd'hui sans état coché existant est décochée par
+ *   défaut (nouveau jour scolaire) ;
+ * - une matière avec un état coché existant reflète cet état ;
+ * - un état coché dont le `sourceId` ne correspond à aucune matière reçue ici
+ *   (matière retirée de l'EDT du jour depuis) est simplement ignoré -- pas de
+ *   purge active requise (AD-3), et le rappel correspondant disparaît
+ *   naturellement puisqu'il n'est jamais généré ;
+ * - une matière avec plusieurs créneaux aujourd'hui n'apparaît qu'une fois
+ *   ici -- dédupliquée en amont par `subjects` (l'appelant transmet le
+ *   résultat de `dedupeSubjectsFromSlots`, jamais les créneaux bruts).
+ *
+ * Pure : ne décide pas de "aujourd'hui est sans cours" -- si `subjects` est
+ * vide, l'appelant (app/(accueil)/page.tsx) n'affiche aucun bloc plutôt que
+ * d'invoquer cette fonction sur une liste vide (Boundaries spec 2.6 : jamais
+ * de message neutre pour ce bloc, contrairement au Sac).
+ */
+export function deriveRevisionsChecklist(
+  subjects: readonly RevisionSubjectInput[],
+  checkedStates: readonly ChecklistItemStateInput[]
+): DerivedRevisionItem[] {
+  const checkedBySourceId = new Map<string, boolean>();
+  for (const state of checkedStates) {
+    if (state.sourceType === CHECKLIST_SOURCE_TYPE_SUBJECT) {
+      checkedBySourceId.set(state.sourceId, state.checked);
+    }
+  }
+
+  return subjects.map((subject) => ({
+    sourceId: subject.id,
+    sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT,
+    label: `Revoir le cours ${withDePrefix(subject.name)}`,
+    checked: checkedBySourceId.get(subject.id) ?? false,
+    subject: { id: subject.id, name: subject.name, colorIndex: subject.colorIndex },
+  }));
+}
+
 /** Un `FixedChecklistItem` (Matin ici), tel que chargé par data/checklist.ts. */
 export interface FixedChecklistItemInput {
   id: string;

@@ -13,6 +13,7 @@ import {
   toggleChecklistItem,
   toggleMatinChecklistItem,
   toggleRetourChecklistItem,
+  toggleRevisionsChecklistItem,
 } from "./checklist";
 
 // Tests d'intégration contre la vraie base de dev (SQLite). Contrairement à
@@ -33,6 +34,7 @@ const TEST_SOURCE_IDS = [
   "action-test-matin-item",
   "action-test-retour-item",
   "action-test-devoir-a-rendre-item",
+  "action-test-revisions-item",
 ];
 
 const TEST_RETOUR_CREATE_LABEL = "action-test-retour-create-label";
@@ -167,6 +169,47 @@ describe("toggleRetourChecklistItem -- wrapper RETOUR/FIXED_ITEM (spec 2.3)", ()
     expect(rows).toHaveLength(2);
     expect(rows.find((row) => row.checklistType === "MATIN")?.checked).toBe(true);
     expect(rows.find((row) => row.checklistType === "RETOUR")?.checked).toBe(false);
+  });
+});
+
+describe("toggleRevisionsChecklistItem -- wrapper REVISIONS/SUBJECT (spec 2.6, FR-19)", () => {
+  it("écrit REVISIONS/SUBJECT sans que l'appelant ait à connaître ces constantes", async () => {
+    const result = await toggleRevisionsChecklistItem({
+      date: "2026-12-20",
+      sourceId: "action-test-revisions-item",
+      checked: true,
+    });
+
+    expect(result.ok).toBe(true);
+
+    const rows = await prisma.checklistItemState.findMany({
+      where: { sourceId: "action-test-revisions-item" },
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].checklistType).toBe("REVISIONS");
+    expect(rows[0].sourceType).toBe("SUBJECT");
+    expect(rows[0].checked).toBe(true);
+  });
+
+  it("reste indépendant de MATIN/RETOUR -- même sourceId, checklistType différent", async () => {
+    await toggleMatinChecklistItem({
+      date: "2026-12-20",
+      sourceId: "action-test-revisions-item",
+      checked: true,
+    });
+    await toggleRevisionsChecklistItem({
+      date: "2026-12-20",
+      sourceId: "action-test-revisions-item",
+      checked: false,
+    });
+
+    const rows = await prisma.checklistItemState.findMany({
+      where: { sourceId: "action-test-revisions-item" },
+      orderBy: { checklistType: "asc" },
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows.find((row) => row.checklistType === "MATIN")?.checked).toBe(true);
+    expect(rows.find((row) => row.checklistType === "REVISIONS")?.checked).toBe(false);
   });
 });
 

@@ -25,10 +25,12 @@ import {
 import {
   CHECKLIST_TYPE_MATIN,
   CHECKLIST_TYPE_RETOUR,
+  CHECKLIST_TYPE_REVISIONS,
   CHECKLIST_TYPE_SAC,
   DEFAULT_MATIN_ITEMS,
   DEFAULT_RETOUR_ITEMS,
   deriveFixedChecklist,
+  deriveRevisionsChecklist,
   deriveSacChecklist,
   partitionDevoirsARendreForSac,
   type ChecklistSubjectGroupInput,
@@ -37,10 +39,12 @@ import { computeDaysRemaining } from "@/domain/homework";
 import {
   toggleMatinChecklistItem,
   toggleRetourChecklistItem,
+  toggleRevisionsChecklistItem,
 } from "@/actions/checklist";
 import { deleteDevoirAction, toggleDevoirDoneAction } from "@/actions/homework";
 import { SacChecklist } from "@/components/checklist/sac-checklist";
 import { FixedChecklist } from "@/components/checklist/fixed-checklist";
+import { RevisionsChecklist } from "@/components/checklist/revisions-checklist";
 import { DevoirsList } from "@/components/homework/devoirs-list";
 import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
 
@@ -212,6 +216,22 @@ export default async function AccueilPage() {
   const todayDate = getTodaySchoolDate(now);
   const todayIso = schoolDateToIso(todayDate);
   const todayDateAsDate = new Date(`${todayIso}T00:00:00.000Z`);
+  const todayWeekday = schoolDateToWeekday(todayDate);
+
+  // "Révisions du jour" (Story 2.6, FR-19) : porte sur AUJOURD'HUI, calculé
+  // indépendamment du bloc Sac (qui regarde demain) -- même mécanisme exact
+  // que `tomorrowSlots`/`tomorrowSubjects` plus haut, appliqué à aujourd'hui.
+  const todayParity = weekAReferenceMondayIso
+    ? computeWeekParity(todayIso, weekAReferenceMondayIso)
+    : null;
+  const todaySlots = deriveDaySlots(
+    slots,
+    todayWeekday,
+    todayIso,
+    noSchoolDayIsoSet,
+    todayParity
+  );
+  const todaySubjects = dedupeSubjectsFromSlots(todaySlots, subjects);
 
   // "Retour" (Story 2.3) : même mécanisme exact que "Ce matin" ci-dessus --
   // porte sur AUJOURD'HUI (AD-4), indépendant de l'EDT, toujours affiché.
@@ -220,13 +240,26 @@ export default async function AccueilPage() {
   // spec 2.3). Les 4 requêtes Matin+Retour sont batchées dans un seul
   // Promise.all (indépendantes entre elles) plutôt que deux Promise.all
   // séquentiels, pour ne pas payer un aller-retour DB supplémentaire.
-  const [matinItems, matinCheckedStates, retourItems, retourCheckedStates] =
-    await Promise.all([
-      listFixedChecklistItems(user.id, CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS),
-      listChecklistItemStates(user.id, todayDateAsDate, CHECKLIST_TYPE_MATIN),
-      listFixedChecklistItems(user.id, CHECKLIST_TYPE_RETOUR, DEFAULT_RETOUR_ITEMS),
-      listChecklistItemStates(user.id, todayDateAsDate, CHECKLIST_TYPE_RETOUR),
-    ]);
+  const [
+    matinItems,
+    matinCheckedStates,
+    retourItems,
+    retourCheckedStates,
+    revisionsCheckedStates,
+  ] = await Promise.all([
+    listFixedChecklistItems(user.id, CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS),
+    listChecklistItemStates(user.id, todayDateAsDate, CHECKLIST_TYPE_MATIN),
+    listFixedChecklistItems(user.id, CHECKLIST_TYPE_RETOUR, DEFAULT_RETOUR_ITEMS),
+    listChecklistItemStates(user.id, todayDateAsDate, CHECKLIST_TYPE_RETOUR),
+    // Optimisation : évite une requête inutile un jour sans cours (pas
+    // exigé par le Boundaries de la spec 2.6, qui ne dit rien sur ce point).
+    // Type explicite pour que la branche vide reste alignée avec le type de
+    // retour réel de `listChecklistItemStates`, plutôt qu'un `Promise<never[]>`
+    // inféré coïncidant seulement par structure.
+    todaySubjects.length > 0
+      ? listChecklistItemStates(user.id, todayDateAsDate, CHECKLIST_TYPE_REVISIONS)
+      : Promise.resolve<Awaited<ReturnType<typeof listChecklistItemStates>>>([]),
+  ]);
 
   const matinChecklist = deriveFixedChecklist(
     matinItems.map((item) => ({ id: item.id, label: item.label })),
@@ -240,6 +273,19 @@ export default async function AccueilPage() {
   const retourChecklist = deriveFixedChecklist(
     retourItems.map((item) => ({ id: item.id, label: item.label })),
     retourCheckedStates.map((state) => ({
+      sourceType: state.sourceType,
+      sourceId: state.sourceId,
+      checked: state.checked,
+    }))
+  );
+
+  const revisionsChecklist = deriveRevisionsChecklist(
+    todaySubjects.map((subject) => ({
+      id: subject.id,
+      name: subject.name,
+      colorIndex: subject.colorIndex,
+    })),
+    revisionsCheckedStates.map((state) => ({
       sourceType: state.sourceType,
       sourceId: state.sourceId,
       checked: state.checked,
@@ -350,6 +396,12 @@ export default async function AccueilPage() {
         dateIso={todayIso}
         headingId="retour-heading"
         onToggle={toggleRetourChecklistItem}
+      />
+
+      <RevisionsChecklist
+        items={revisionsChecklist}
+        dateIso={todayIso}
+        onToggle={toggleRevisionsChecklistItem}
       />
 
       <DevoirsList

@@ -2,18 +2,22 @@ import { describe, expect, it } from "vitest";
 import {
   CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
   CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+  CHECKLIST_SOURCE_TYPE_SUBJECT,
   CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
   CHECKLIST_TYPE_MATIN,
   CHECKLIST_TYPE_RETOUR,
   DEFAULT_RETOUR_ITEMS,
   deriveFixedChecklist,
+  deriveRevisionsChecklist,
   deriveSacChecklist,
   partitionDevoirsARendreForSac,
   type ChecklistItemStateInput,
   type ChecklistSubjectGroupInput,
   type DevoirARendreInput,
   type FixedChecklistItemInput,
+  type RevisionSubjectInput,
 } from "./checklist";
+import { dedupeSubjectsFromSlots } from "./schedule";
 
 const MATHS = { id: "subject-maths", name: "Maths", colorIndex: 1 };
 const EPS = { id: "subject-eps", name: "EPS", colorIndex: 2 };
@@ -558,5 +562,130 @@ describe("deriveFixedChecklist -- Retour (spec 2.3 I/O matrix, mêmes cas que Ma
     const result = deriveFixedChecklist(items, []);
 
     expect(result.every((item) => item.checked === false)).toBe(true);
+  });
+});
+
+describe("deriveRevisionsChecklist (Story 2.6, FR-19 -- I/O matrix spec 2.6)", () => {
+  it("produces one reminder per subject followed today, unchecked by default", () => {
+    const subjects: RevisionSubjectInput[] = [
+      { id: "subject-svt", name: "SVT", colorIndex: 3 },
+      { id: "subject-francais", name: "Français", colorIndex: 4 },
+    ];
+
+    const result = deriveRevisionsChecklist(subjects, []);
+
+    expect(result).toEqual([
+      {
+        sourceId: "subject-svt",
+        sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT,
+        label: "Revoir le cours de SVT",
+        checked: false,
+        subject: { id: "subject-svt", name: "SVT", colorIndex: 3 },
+      },
+      {
+        sourceId: "subject-francais",
+        sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT,
+        label: "Revoir le cours de Français",
+        checked: false,
+        subject: { id: "subject-francais", name: "Français", colorIndex: 4 },
+      },
+    ]);
+  });
+
+  it("returns an empty list when no subject is followed today (no course today)", () => {
+    const result = deriveRevisionsChecklist([], []);
+
+    expect(result).toEqual([]);
+  });
+
+  it("reflects an existing checked state keyed by sourceId = Subject.id", () => {
+    const subjects: RevisionSubjectInput[] = [MATHS];
+    const states: ChecklistItemStateInput[] = [
+      {
+        sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT,
+        sourceId: "subject-maths",
+        checked: true,
+      },
+    ];
+
+    const result = deriveRevisionsChecklist(subjects, states);
+
+    expect(result[0].checked).toBe(true);
+  });
+
+  it("ignores a checked state whose sourceId no longer matches any subject followed today", () => {
+    const subjects: RevisionSubjectInput[] = [MATHS];
+    const states: ChecklistItemStateInput[] = [
+      {
+        sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT,
+        sourceId: "subject-removed-from-today",
+        checked: true,
+      },
+    ];
+
+    const result = deriveRevisionsChecklist(subjects, states);
+
+    expect(result).toHaveLength(1);
+    expect(result[0].checked).toBe(false);
+  });
+
+  it("does not confuse a SUBJECT checked state with another sourceType sharing the same sourceId", () => {
+    const subjects: RevisionSubjectInput[] = [MATHS];
+    const states: ChecklistItemStateInput[] = [
+      {
+        sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
+        sourceId: "subject-maths",
+        checked: true,
+      },
+    ];
+
+    const result = deriveRevisionsChecklist(subjects, states);
+
+    expect(result[0].checked).toBe(false);
+  });
+
+  it("elides 'de' to 'd\\'' before a subject name starting with a vowel or a mute h", () => {
+    const subjects: RevisionSubjectInput[] = [
+      { id: "subject-anglais", name: "Anglais", colorIndex: 5 },
+      { id: "subject-histoire", name: "Histoire-Géographie", colorIndex: 6 },
+      { id: "subject-eps", name: "EPS", colorIndex: 7 },
+    ];
+
+    const result = deriveRevisionsChecklist(subjects, []);
+
+    expect(result.map((item) => item.label)).toEqual([
+      "Revoir le cours d'Anglais",
+      "Revoir le cours d'Histoire-Géographie",
+      "Revoir le cours d'EPS",
+    ]);
+  });
+
+  it("keeps 'de' before a subject name starting with a consonant", () => {
+    const subjects: RevisionSubjectInput[] = [MATHS];
+
+    const result = deriveRevisionsChecklist(subjects, []);
+
+    expect(result[0].label).toBe("Revoir le cours de Maths");
+  });
+
+  it("produces a single reminder for a subject with two créneaux today (pipeline avec dedupeSubjectsFromSlots)", () => {
+    // Reproduit le pipeline réel de app/(accueil)/page.tsx : deriveDaySlots
+    // (non testé ici, hors périmètre pur) -> dedupeSubjectsFromSlots ->
+    // deriveRevisionsChecklist -- deux créneaux Maths le même jour ne
+    // doivent produire qu'un seul rappel (I/O matrix spec 2.6).
+    const todaySlots = [
+      { subject: { name: "Maths" } },
+      { subject: { name: "Maths" } },
+      { subject: { name: "Français" } },
+    ];
+    const todaySubjects = dedupeSubjectsFromSlots(todaySlots, [
+      MATHS,
+      { id: "subject-francais", name: "Français", colorIndex: 4 },
+    ]);
+
+    const result = deriveRevisionsChecklist(todaySubjects, []);
+
+    expect(result).toHaveLength(2);
+    expect(result.filter((item) => item.subject.name === "Maths")).toHaveLength(1);
   });
 });

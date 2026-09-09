@@ -4,9 +4,11 @@ import { revalidatePath } from "next/cache";
 import {
   CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
   CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+  CHECKLIST_SOURCE_TYPE_SUBJECT,
   CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
   CHECKLIST_TYPE_MATIN,
   CHECKLIST_TYPE_RETOUR,
+  CHECKLIST_TYPE_REVISIONS,
   CHECKLIST_TYPE_SAC,
 } from "@/domain/checklist";
 import { ensureSeedUser } from "@/data/user";
@@ -88,11 +90,13 @@ const KNOWN_CHECKLIST_TYPES = new Set<string>([
   CHECKLIST_TYPE_SAC,
   CHECKLIST_TYPE_MATIN,
   CHECKLIST_TYPE_RETOUR,
+  CHECKLIST_TYPE_REVISIONS,
 ]);
 const KNOWN_SOURCE_TYPES = new Set<string>([
   CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
   CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
   CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
+  CHECKLIST_SOURCE_TYPE_SUBJECT,
 ]);
 
 export async function toggleChecklistItem(
@@ -330,5 +334,19 @@ export async function toggleRetourChecklistItem(
     ...input,
     checklistType: CHECKLIST_TYPE_RETOUR,
     sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+  });
+}
+
+/** Coche/décoche un rappel de "Révisions du jour" (Story 2.6) -- wrapper de
+ * `toggleChecklistItem` avec `checklistType`/`sourceType` fixés à
+ * REVISIONS/SUBJECT (`sourceId` = `Subject.id` directement, pas d'entité
+ * dédiée), même rôle que `toggleMatinChecklistItem`/`toggleRetourChecklistItem`. */
+export async function toggleRevisionsChecklistItem(
+  input: Omit<ToggleChecklistItemInput, "checklistType" | "sourceType">
+): Promise<ActionResult<null>> {
+  return toggleChecklistItem({
+    ...input,
+    checklistType: CHECKLIST_TYPE_REVISIONS,
+    sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT,
   });
 }
