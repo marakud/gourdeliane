@@ -423,24 +423,21 @@ export default async function AccueilPage() {
         }
         soir={
           <MomentSoirCard complete={soirComplete}>
-            {sacGroups.length > 0 || devoirsForTomorrow.length > 0 ? (
-              <SacChecklist
-                groups={sacGroups}
-                devoirsForTomorrow={devoirsForTomorrow}
-                dateIso={tomorrowIso}
+            {revisionsChecklist.length > 0 && (
+              <RevisionsChecklist
+                items={revisionsChecklist}
+                dateIso={todayIso}
+                onToggle={toggleRevisionsChecklistItem}
               />
-            ) : (
-              <div className="flex flex-col gap-2">
-                <h3 className="font-heading text-base font-semibold text-foreground">
-                  Avant d&apos;aller se coucher
-                </h3>
-                <p className="text-base text-muted-foreground">
-                  Pas cours demain, profite de ta soirée !
-                </p>
-              </div>
             )}
 
-            <div className="flex flex-col gap-4 border-t border-border pt-4">
+            <div
+              className={
+                revisionsChecklist.length > 0
+                  ? "flex flex-col gap-4 border-t border-border pt-4"
+                  : "flex flex-col gap-4"
+              }
+            >
               <DevoirsList
                 devoirs={devoirsView}
                 onToggle={toggleDevoirDoneAction}
@@ -450,15 +447,24 @@ export default async function AccueilPage() {
               />
             </div>
 
-            {revisionsChecklist.length > 0 && (
-              <div className="flex flex-col gap-4 border-t border-border pt-4">
-                <RevisionsChecklist
-                  items={revisionsChecklist}
-                  dateIso={todayIso}
-                  onToggle={toggleRevisionsChecklistItem}
+            <div className="flex flex-col gap-4 border-t border-border pt-4">
+              {sacGroups.length > 0 || devoirsForTomorrow.length > 0 ? (
+                <SacChecklist
+                  groups={sacGroups}
+                  devoirsForTomorrow={devoirsForTomorrow}
+                  dateIso={tomorrowIso}
                 />
-              </div>
-            )}
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <h3 className="font-heading text-base font-semibold text-foreground">
+                    Avant d&apos;aller se coucher
+                  </h3>
+                  <p className="text-base text-muted-foreground">
+                    Pas cours demain, profite de ta soirée !
+                  </p>
+                </div>
+              )}
+            </div>
           </MomentSoirCard>
         }
       />
