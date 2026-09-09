@@ -238,7 +238,7 @@ export function DevoirsList({
                       >
                         {devoir.description}
                       </span>
-                      <span className="truncate text-sm text-muted-foreground">
+                      <span className="text-sm text-muted-foreground">
                         {devoir.subject.name}
                         {devoir.echeanceLabel && devoir.daysRemaining !== null && (
                           <> · Échéance : {devoir.echeanceLabel} ({daysRemainingLabel(devoir.daysRemaining)})</>
