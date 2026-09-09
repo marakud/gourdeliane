@@ -16,6 +16,7 @@ import {
   type Weekday,
 } from "@/domain/schedule";
 import {
+  getCurrentMoment,
   getTodaySchoolDate,
   getTomorrowSchoolDate,
   schoolDateToIso,
@@ -49,6 +50,7 @@ import { RevisionsChecklist } from "@/components/checklist/revisions-checklist";
 import { DevoirsList } from "@/components/homework/devoirs-list";
 import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
 import { MomentSoirCard } from "@/components/moment/moment-soir-card";
+import { MomentTabs } from "@/components/moment/moment-tabs";
 
 // Même technique que `formatFrenchDate`
 // (components/schedule/no-school-day-panel.tsx) : ancrage midi UTC pour
@@ -379,6 +381,13 @@ export default async function AccueilPage() {
 
   const { dateLabel, timeLabel } = formatGreetingDateTime(now);
 
+  // Retour utilisateur -- Accueil affiche désormais UN SEUL moment par
+  // défaut (fidèle à l'intention UX d'origine, EXPERIENCE.md), calculé côté
+  // serveur en America/Guadeloupe fixe (AD-4), jamais depuis l'heure locale
+  // du client. Les deux autres restent accessibles via `MomentTabs`
+  // (bascule 100% client, aucun rechargement).
+  const currentMoment = getCurrentMoment(now);
+
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-8">
       <div>
@@ -390,59 +399,68 @@ export default async function AccueilPage() {
         </p>
       </div>
 
-      <MomentSoirCard complete={soirComplete}>
-        {sacGroups.length > 0 || devoirsForTomorrow.length > 0 ? (
-          <SacChecklist
-            groups={sacGroups}
-            devoirsForTomorrow={devoirsForTomorrow}
-            dateIso={tomorrowIso}
+      <MomentTabs
+        initialActive={currentMoment}
+        matin={
+          <FixedChecklist
+            title="Ce matin"
+            items={matinChecklist}
+            dateIso={todayIso}
+            headingId="matin-heading"
+            onToggle={toggleMatinChecklistItem}
+            hideTitle
           />
-        ) : (
-          <div className="flex flex-col gap-2">
-            <h3 className="font-heading text-base font-semibold text-foreground">
-              Avant d&apos;aller se coucher
-            </h3>
-            <p className="text-base text-muted-foreground">
-              Pas cours demain, profite de ta soirée !
-            </p>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-4 border-t border-border pt-4">
-          <DevoirsList
-            devoirs={devoirsView}
-            onToggle={toggleDevoirDoneAction}
-            onDelete={deleteDevoirAction}
-            subjects={homeworkSubjects}
-            scheduleSlots={slots}
+        }
+        retour={
+          <FixedChecklist
+            title="Retour"
+            items={retourChecklist}
+            dateIso={todayIso}
+            headingId="retour-heading"
+            onToggle={toggleRetourChecklistItem}
+            hideTitle
           />
-        </div>
+        }
+        soir={
+          <MomentSoirCard complete={soirComplete}>
+            {sacGroups.length > 0 || devoirsForTomorrow.length > 0 ? (
+              <SacChecklist
+                groups={sacGroups}
+                devoirsForTomorrow={devoirsForTomorrow}
+                dateIso={tomorrowIso}
+              />
+            ) : (
+              <div className="flex flex-col gap-2">
+                <h3 className="font-heading text-base font-semibold text-foreground">
+                  Avant d&apos;aller se coucher
+                </h3>
+                <p className="text-base text-muted-foreground">
+                  Pas cours demain, profite de ta soirée !
+                </p>
+              </div>
+            )}
 
-        {revisionsChecklist.length > 0 && (
-          <div className="flex flex-col gap-4 border-t border-border pt-4">
-            <RevisionsChecklist
-              items={revisionsChecklist}
-              dateIso={todayIso}
-              onToggle={toggleRevisionsChecklistItem}
-            />
-          </div>
-        )}
-      </MomentSoirCard>
+            <div className="flex flex-col gap-4 border-t border-border pt-4">
+              <DevoirsList
+                devoirs={devoirsView}
+                onToggle={toggleDevoirDoneAction}
+                onDelete={deleteDevoirAction}
+                subjects={homeworkSubjects}
+                scheduleSlots={slots}
+              />
+            </div>
 
-      <FixedChecklist
-        title="Ce matin"
-        items={matinChecklist}
-        dateIso={todayIso}
-        headingId="matin-heading"
-        onToggle={toggleMatinChecklistItem}
-      />
-
-      <FixedChecklist
-        title="Retour"
-        items={retourChecklist}
-        dateIso={todayIso}
-        headingId="retour-heading"
-        onToggle={toggleRetourChecklistItem}
+            {revisionsChecklist.length > 0 && (
+              <div className="flex flex-col gap-4 border-t border-border pt-4">
+                <RevisionsChecklist
+                  items={revisionsChecklist}
+                  dateIso={todayIso}
+                  onToggle={toggleRevisionsChecklistItem}
+                />
+              </div>
+            )}
+          </MomentSoirCard>
+        }
       />
 
       <AddHomeworkFab subjects={homeworkSubjects} scheduleSlots={slots} />

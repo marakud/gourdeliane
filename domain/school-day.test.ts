@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  getCurrentMoment,
   getTodaySchoolDate,
   getTomorrowSchoolDate,
   schoolDateToIso,
@@ -85,5 +86,51 @@ describe("schoolDateToWeekday", () => {
     expect(schoolDateToWeekday({ year: 2027, month: 1, day: 1 })).toBe(
       "FRIDAY"
     );
+  });
+});
+
+describe("getCurrentMoment (retour utilisateur -- Accueil contextuel, America/Guadeloupe fixe UTC-4)", () => {
+  it("returns MATIN in the middle of the morning window (07:30 local = 11:30 UTC)", () => {
+    expect(getCurrentMoment(new Date("2026-09-09T11:30:00Z"))).toBe("MATIN");
+  });
+
+  it("returns RETOUR in the middle of the afternoon window (13:00 local = 17:00 UTC)", () => {
+    expect(getCurrentMoment(new Date("2026-09-09T17:00:00Z"))).toBe("RETOUR");
+  });
+
+  it("returns SOIR in the evening (20:00 local = 00:00 UTC next day)", () => {
+    expect(getCurrentMoment(new Date("2026-09-10T00:00:00Z"))).toBe("SOIR");
+  });
+
+  it("returns SOIR right at local midnight, the wrap-point of the evening window (00:00 local = 04:00 UTC)", () => {
+    expect(getCurrentMoment(new Date("2026-09-09T04:00:00Z"))).toBe("SOIR");
+  });
+
+  it("returns SOIR after midnight, before the morning window starts (01:00 local = 05:00 UTC)", () => {
+    expect(getCurrentMoment(new Date("2026-09-09T05:00:00Z"))).toBe("SOIR");
+  });
+
+  it("stays SOIR right up to the 04:00 local boundary (03:59 local = 07:59 UTC)", () => {
+    expect(getCurrentMoment(new Date("2026-09-09T07:59:00Z"))).toBe("SOIR");
+  });
+
+  it("switches to MATIN exactly at the 04:00 local boundary (04:00 local = 08:00 UTC)", () => {
+    expect(getCurrentMoment(new Date("2026-09-09T08:00:00Z"))).toBe("MATIN");
+  });
+
+  it("stays MATIN right up to the 12:00 local boundary (11:59 local = 15:59 UTC)", () => {
+    expect(getCurrentMoment(new Date("2026-09-09T15:59:00Z"))).toBe("MATIN");
+  });
+
+  it("switches to RETOUR exactly at the 12:00 local boundary (12:00 local = 16:00 UTC)", () => {
+    expect(getCurrentMoment(new Date("2026-09-09T16:00:00Z"))).toBe("RETOUR");
+  });
+
+  it("stays RETOUR right up to the 18:00 local boundary (17:59 local = 21:59 UTC)", () => {
+    expect(getCurrentMoment(new Date("2026-09-09T21:59:00Z"))).toBe("RETOUR");
+  });
+
+  it("switches to SOIR exactly at the 18:00 local boundary (18:00 local = 22:00 UTC)", () => {
+    expect(getCurrentMoment(new Date("2026-09-09T22:00:00Z"))).toBe("SOIR");
   });
 });

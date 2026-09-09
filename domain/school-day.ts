@@ -87,3 +87,43 @@ export function schoolDateToIso(date: SchoolDate): string {
   const day = String(date.day).padStart(2, "0");
   return `${date.year}-${month}-${day}`;
 }
+
+// Retour utilisateur -- Accueil affichait "Ce soir"/"Ce matin"/"Retour"
+// empilés et dépliés en permanence ("beaucoup d'information" pour un
+// enfant), alors que l'intention UX d'origine (EXPERIENCE.md) était un
+// écran contextuel montrant UN SEUL moment à la fois. `getCurrentMoment`
+// détermine lequel, selon l'heure -- fenêtres fixes, non configurables pour
+// l'instant (même "choix assumé, personnalisable plus tard" que
+// `DEFAULT_MATIN_ITEMS`, Epic 3 story 3.4 permettra un jour de régler ces
+// heures).
+export type DayMoment = "MATIN" | "RETOUR" | "SOIR";
+
+/** Heure (0-23) dans SCHOOL_TIME_ZONE pour l'instant `now` donné.
+ * `hourCycle: "h23"` + lecture via `formatToParts` (jamais `Number(format())`
+ * directement) : certains moteurs ICU renvoient "24" plutôt que "00" pour
+ * minuit avec `hour12: false` seul -- le modulo 24 s'en protège même si ce
+ * cas ne s'est jamais présenté en pratique. */
+function currentHour(now: Date): number {
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: SCHOOL_TIME_ZONE,
+    hour: "2-digit",
+    hourCycle: "h23",
+  });
+  const hour = Number(
+    formatter.formatToParts(now).find((part) => part.type === "hour")?.value
+  );
+  return hour % 24;
+}
+
+/**
+ * Moment de la journée actif "maintenant" (retour utilisateur -- Accueil
+ * contextuel) : Matin [04h, 12h), Retour [12h, 18h), Soir [18h, 04h)
+ * -- cette dernière fenêtre chevauche minuit (une soirée commencée avant
+ * minuit reste "Ce soir" après minuit, jusqu'au réveil).
+ */
+export function getCurrentMoment(now: Date): DayMoment {
+  const hour = currentHour(now);
+  if (hour >= 4 && hour < 12) return "MATIN";
+  if (hour >= 12 && hour < 18) return "RETOUR";
+  return "SOIR";
+}

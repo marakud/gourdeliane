@@ -39,9 +39,15 @@ export interface FixedChecklistProps {
   dateIso: string;
   // `id` du <h2> pour `aria-labelledby` -- doit être unique par instance
   // puisque Matin et Retour s'affichent tous deux sur Accueil (ex.
-  // "matin-heading" / "retour-heading").
+  // "matin-heading" / "retour-heading"). Ignoré si `hideTitle`.
   headingId: string;
   onToggle: ToggleFixedChecklistItemAction;
+  // Retour utilisateur (Accueil contextuel, MomentTabs) -- `title` devient
+  // redondant avec le libellé de l'onglet parent ("Ce matin"/"Retour")
+  // quand ce composant vit dans un panneau d'onglet ; masque le `<h2>` (et
+  // le `<section>` qui le référence, devenu un simple `<div>`) sans changer
+  // le reste -- le compteur X/Y reste affiché.
+  hideTitle?: boolean;
 }
 
 export function FixedChecklist({
@@ -50,6 +56,7 @@ export function FixedChecklist({
   dateIso,
   headingId,
   onToggle,
+  hideTitle = false,
 }: FixedChecklistProps) {
   const [checkedById, setCheckedById] = useState<Record<string, boolean>>(
     () => {
@@ -93,15 +100,34 @@ export function FixedChecklist({
   const total = items.length;
   const done = items.filter((item) => checkedById[item.sourceId]).length;
 
+  const Wrapper = hideTitle ? "div" : "section";
+
   return (
-    <section
+    <Wrapper
       aria-labelledby={headingId}
       className="flex flex-col gap-4 rounded-2xl bg-card p-4 ring-1 ring-border"
     >
-      <div className="flex items-center justify-between gap-2">
+      <div
+        className={cn(
+          "flex items-center gap-2",
+          hideTitle ? "justify-end" : "justify-between"
+        )}
+      >
+        {/* `sr-only` plutôt qu'omis quand `hideTitle` (correctif de revue) --
+            sans lui, la hiérarchie de titres de la page sautait de <h1>
+            (Accueil) à <h3> (items de la liste), un niveau manquant qui
+            perturbe la navigation par titres au lecteur d'écran. `sr-only`
+            est `position: absolute` : ne participe pas au flex ni au `gap`
+            de cette ligne, donc ne laisse aucun espace vide quand `total`
+            est 0 (autre correctif de revue -- avant, un `null` ici laissait
+            la ligne d'en-tête entièrement vide mais consommait quand même
+            le `gap-4` du parent). */}
         <h2
           id={headingId}
-          className="font-heading text-lg font-semibold text-foreground"
+          className={cn(
+            "font-heading text-lg font-semibold text-foreground",
+            hideTitle && "sr-only"
+          )}
         >
           {title}
         </h2>
@@ -164,6 +190,6 @@ export function FixedChecklist({
           );
         })}
       </ul>
-    </section>
+    </Wrapper>
   );
 }
