@@ -2,7 +2,7 @@
 title: 'Story 2.5 — Lier un devoir à rendre à mon sac du lendemain'
 type: 'feature'
 created: '2026-09-09'
-status: 'review'
+status: 'done'
 review_loop_iteration: 1
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
@@ -89,6 +89,7 @@ L'insertion d'un devoir "à rendre" dans le Sac est **conditionnée à l'existen
 - `npm run build` -- OK, build de production réussit.
 - Revue adversariale à 3 couches (blind-hunter, edge-case-hunter, verification-gap) en parallèle sur le diff complet -- voir Spec Change Log pour le détail des correctifs.
 - Vérifié dans le navigateur (`npm run dev`) : un devoir "à rendre" échéant demain sur une matière ayant cours demain (Maths) apparaît comme objet cochable dans le Sac ("Exercice modifié avec succès à rendre") et disparaît de "Devoirs pour demain" ; le cocher passe le Sac à 1/1 sans toucher au bloc "Devoirs" (resté 0/1, `Devoir.done` inchangé) ; persiste après rechargement de page ; un second devoir "à rendre" échéant demain sur une matière SANS cours demain (Histoire) reste correctement affiché dans "Devoirs pour demain" plutôt que de disparaître.
+- Confirmé en production par l'utilisateur ("ca marche").
 
 ## Suggested Review Order
 
