@@ -120,17 +120,11 @@ export function SacChecklist({
   );
 
   return (
-    <section
-      aria-labelledby="sac-heading"
-      className="flex flex-col gap-4 rounded-2xl bg-card p-4 ring-1 ring-border"
-    >
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
-        <h2
-          id="sac-heading"
-          className="font-heading text-lg font-semibold text-foreground"
-        >
+        <h3 className="font-heading text-base font-semibold text-foreground">
           Avant d&apos;aller se coucher
-        </h2>
+        </h3>
         {total > 0 && (
           <span className="text-sm font-medium text-muted-foreground">
             {done}/{total}
@@ -220,9 +214,9 @@ export function SacChecklist({
             groups.length > 0 && "border-t border-border pt-3"
           )}
         >
-          <h3 className="text-sm font-semibold text-foreground">
+          <h4 className="text-sm font-semibold text-foreground">
             Devoirs pour demain
-          </h3>
+          </h4>
           <ul className="flex flex-col gap-1.5">
             {devoirsForTomorrow.map((devoir) => (
               <li
@@ -242,6 +236,6 @@ export function SacChecklist({
           </ul>
         </div>
       )}
-    </section>
+    </div>
   );
 }

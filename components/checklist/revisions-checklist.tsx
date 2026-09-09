@@ -76,17 +76,11 @@ export function RevisionsChecklist({
   const done = items.filter((item) => checkedById[item.sourceId]).length;
 
   return (
-    <section
-      aria-labelledby="revisions-heading"
-      className="flex flex-col gap-4 rounded-2xl bg-card p-4 ring-1 ring-border"
-    >
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
-        <h2
-          id="revisions-heading"
-          className="font-heading text-lg font-semibold text-foreground"
-        >
+        <h3 className="font-heading text-base font-semibold text-foreground">
           Révisions du jour
-        </h2>
+        </h3>
         <span className="text-sm font-medium text-muted-foreground">
           {done}/{total}
         </span>
@@ -142,6 +136,6 @@ export function RevisionsChecklist({
           );
         })}
       </ul>
-    </section>
+    </div>
   );
 }

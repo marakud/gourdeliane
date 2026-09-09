@@ -8,6 +8,8 @@ import {
   toggleDevoirDoneAction,
   updateDevoirAction,
 } from "./homework";
+import { DAY_COMPLETION_MOMENT_SOIR } from "../domain/day-completion";
+import { getTodaySchoolDate, schoolDateToIso } from "../domain/school-day";
 
 // Tests d'intégration contre la vraie base de dev (SQLite). Comme
 // actions/checklist.test.ts, ces actions appellent en interne
@@ -58,6 +60,20 @@ afterAll(async () => {
   if (subjectId) {
     await prisma.subject.delete({ where: { id: subjectId } }).catch(() => {});
   }
+  // Story 2.7 -- `toggleDevoirDoneAction` appelle désormais
+  // `recomputeAndPersistSoirCompletion` sur le VRAI utilisateur avec
+  // `new Date()` -- même nettoyage que actions/checklist.test.ts, pour ne
+  // pas laisser une ligne DayCompletion s'accumuler sur la vraie base de dev
+  // à chaque exécution de la suite (correctif de revue).
+  const user = await ensureSeedUser();
+  const todayIso = schoolDateToIso(getTodaySchoolDate(new Date()));
+  await prisma.dayCompletion.deleteMany({
+    where: {
+      userId: user.id,
+      date: new Date(`${todayIso}T00:00:00.000Z`),
+      moment: DAY_COMPLETION_MOMENT_SOIR,
+    },
+  });
   await prisma.$disconnect();
 });
 

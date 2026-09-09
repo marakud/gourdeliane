@@ -174,17 +174,11 @@ export function DevoirsList({
   const doneCount = visibleDevoirs.filter((devoir) => doneById[devoir.id]).length;
 
   return (
-    <section
-      aria-labelledby="devoirs-heading"
-      className="flex flex-col gap-4 rounded-2xl bg-card p-4 ring-1 ring-border"
-    >
+    <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
-        <h2
-          id="devoirs-heading"
-          className="font-heading text-lg font-semibold text-foreground"
-        >
-          Devoirs
-        </h2>
+        <h3 className="font-heading text-base font-semibold text-foreground">
+          Devoirs à faire
+        </h3>
         {visibleDevoirs.length > 0 && (
           <span className="text-sm font-medium text-muted-foreground">
             {doneCount}/{visibleDevoirs.length}
@@ -299,6 +293,6 @@ export function DevoirsList({
           })}
         </ul>
       )}
-    </section>
+    </div>
   );
 }

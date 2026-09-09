@@ -36,6 +36,7 @@ import {
   type ChecklistSubjectGroupInput,
 } from "@/domain/checklist";
 import { computeDaysRemaining } from "@/domain/homework";
+import { computeSoirCompletion } from "@/domain/day-completion";
 import {
   toggleMatinChecklistItem,
   toggleRetourChecklistItem,
@@ -47,6 +48,7 @@ import { FixedChecklist } from "@/components/checklist/fixed-checklist";
 import { RevisionsChecklist } from "@/components/checklist/revisions-checklist";
 import { DevoirsList } from "@/components/homework/devoirs-list";
 import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
+import { MomentSoirCard } from "@/components/moment/moment-soir-card";
 
 // Même technique que `formatFrenchDate`
 // (components/schedule/no-school-day-panel.tsx) : ancrage midi UTC pour
@@ -357,6 +359,24 @@ export default async function AccueilPage() {
       !devoirsARendreConsumedIds.has(devoir.id)
   );
 
+  // Complétude du moment "Ce soir" (Story 2.7, FR-20, AD-5) : calculée ici à
+  // partir des données déjà chargées (sacGroups/revisionsChecklist/devoirs),
+  // aucun aller-retour DB supplémentaire pour l'affichage -- même fonction
+  // pure que data/day-completion.ts::recomputeAndPersistSoirCompletion
+  // (appelée par les actions après chaque coche), jamais un second calcul
+  // divergent. `devoirsARendreDemain` reprend TOUS les devoirs "à rendre"
+  // échéant demain (fait ou non, injecté dans le Sac ou non) -- contrairement
+  // à `devoirsForTomorrow` ci-dessus (purement informatif, exclut déjà les
+  // faits et les injectés) : la complétude a besoin de l'état réel de chacun.
+  const devoirsARendreDemain = devoirsView
+    .filter((devoir) => devoir.aRendre && devoir.echeanceIso === tomorrowIso)
+    .map((devoir) => ({ done: devoir.done }));
+  const soirComplete = computeSoirCompletion({
+    sacGroups,
+    revisionsItems: revisionsChecklist,
+    devoirsARendreDemain,
+  });
+
   const { dateLabel, timeLabel } = formatGreetingDateTime(now);
 
   return (
@@ -370,17 +390,44 @@ export default async function AccueilPage() {
         </p>
       </div>
 
-      {sacGroups.length > 0 || devoirsForTomorrow.length > 0 ? (
-        <SacChecklist
-          groups={sacGroups}
-          devoirsForTomorrow={devoirsForTomorrow}
-          dateIso={tomorrowIso}
-        />
-      ) : (
-        <p className="rounded-2xl bg-card px-4 py-8 text-center text-base text-muted-foreground ring-1 ring-border">
-          Pas cours demain, profite de ta soirée !
-        </p>
-      )}
+      <MomentSoirCard complete={soirComplete}>
+        {sacGroups.length > 0 || devoirsForTomorrow.length > 0 ? (
+          <SacChecklist
+            groups={sacGroups}
+            devoirsForTomorrow={devoirsForTomorrow}
+            dateIso={tomorrowIso}
+          />
+        ) : (
+          <div className="flex flex-col gap-2">
+            <h3 className="font-heading text-base font-semibold text-foreground">
+              Avant d&apos;aller se coucher
+            </h3>
+            <p className="text-base text-muted-foreground">
+              Pas cours demain, profite de ta soirée !
+            </p>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-4 border-t border-border pt-4">
+          <DevoirsList
+            devoirs={devoirsView}
+            onToggle={toggleDevoirDoneAction}
+            onDelete={deleteDevoirAction}
+            subjects={homeworkSubjects}
+            scheduleSlots={slots}
+          />
+        </div>
+
+        {revisionsChecklist.length > 0 && (
+          <div className="flex flex-col gap-4 border-t border-border pt-4">
+            <RevisionsChecklist
+              items={revisionsChecklist}
+              dateIso={todayIso}
+              onToggle={toggleRevisionsChecklistItem}
+            />
+          </div>
+        )}
+      </MomentSoirCard>
 
       <FixedChecklist
         title="Ce matin"
@@ -396,20 +443,6 @@ export default async function AccueilPage() {
         dateIso={todayIso}
         headingId="retour-heading"
         onToggle={toggleRetourChecklistItem}
-      />
-
-      <RevisionsChecklist
-        items={revisionsChecklist}
-        dateIso={todayIso}
-        onToggle={toggleRevisionsChecklistItem}
-      />
-
-      <DevoirsList
-        devoirs={devoirsView}
-        onToggle={toggleDevoirDoneAction}
-        onDelete={deleteDevoirAction}
-        subjects={homeworkSubjects}
-        scheduleSlots={slots}
       />
 
       <AddHomeworkFab subjects={homeworkSubjects} scheduleSlots={slots} />

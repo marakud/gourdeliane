@@ -41,6 +41,7 @@ model User {
   fixedChecklistItems         FixedChecklistItem[]
   fixedChecklistDefaultsSeeds FixedChecklistDefaultsSeed[]
   devoirs                     Devoir[]
+  dayCompletions              DayCompletion[]
 }
 
 // Jour de la semaine d'un créneau récurrent.
@@ -243,4 +244,24 @@ model Devoir {
   plannedStartTime String?
 
   @@index([userId, done])
+}
+
+// Complétude persistée par jour scolaire et par moment (Story 2.7, AD-5) --
+// base du futur calcul du Streak (Epic 4, pas construit ici : cette table
+// n'est jamais lue pour agréger un compteur dans cette story, seulement
+// écrite après chaque coche pertinente). `moment` écrit en toutes lettres en
+// `String`, même convention que `ChecklistItemState.checklistType`
+// (domain/checklist.ts) -- "SOIR" est la seule valeur effectivement calculée
+// par cette story ; "MATIN"/"RETOUR" sont des valeurs réservées pour une
+// story future, jamais écrites ici (Never de la spec 2.7).
+model DayCompletion {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  date      DateTime
+  moment    String
+  complete  Boolean
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date, moment])
 }

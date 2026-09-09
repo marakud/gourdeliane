@@ -1,0 +1,69 @@
+// CartableFlow -- domain/day-completion.ts (Story 2.7)
+//
+// Complétude du moment "Ce soir" (FR-20) : Sac + Révisions entièrement
+// cochés (un bloc vide compte comme trivialement complet -- ex. jour sans
+// cours demain) ET tout devoir "à rendre" échéant demain marqué fait. Pure,
+// aucune dépendance vers Next.js ou Prisma (AD-1). Réutilisée à l'identique
+// par app/(accueil)/page.tsx (affichage) ET data/day-completion.ts
+// (persistance après une coche) -- une seule implémentation, jamais deux
+// calculs indépendants qui pourraient diverger (AD-5).
+
+export const DAY_COMPLETION_MOMENT_SOIR = "SOIR" as const;
+
+interface SacGroupLike {
+  items: readonly { checked: boolean }[];
+}
+
+interface ChecklistItemLike {
+  checked: boolean;
+}
+
+interface DevoirARendreDemainLike {
+  done: boolean;
+}
+
+export interface SoirCompletionInput {
+  sacGroups: readonly SacGroupLike[];
+  revisionsItems: readonly ChecklistItemLike[];
+  /** Devoirs déjà filtrés par l'appelant sur `aRendre && échéance === demain`
+   * -- cette fonction ne refait jamais ce filtrage (Boundaries spec 2.7 : un
+   * devoir sans échéance ou échéant plus tard ne doit jamais atteindre ici). */
+  devoirsARendreDemain: readonly DevoirARendreDemainLike[];
+}
+
+/** Un bloc sans objet (ex. Sac un jour sans cours demain) compte comme
+ * trivialement complet -- sinon un soir sans rien à faire ne pourrait jamais
+ * être "complet" (I/O matrix spec 2.7). */
+function isBlockComplete(items: readonly ChecklistItemLike[]): boolean {
+  return items.length === 0 || items.every((item) => item.checked);
+}
+
+/**
+ * Calcule si le moment "Ce soir" est complet (Story 2.7, FR-20, PRD §9
+ * assumption confirmée par epics.md Story 2.7 AC#3) :
+ * - Sac (tous groupes confondus) trivialement-ou-réellement complet ;
+ * - Révisions du jour trivialement-ou-réellement complet ;
+ * - tout devoir "à rendre" échéant demain marqué fait (`devoirsARendreDemain`
+ *   est déjà filtré par l'appelant -- un devoir sans échéance ou échéant
+ *   plus tard n'y figure jamais, donc ne bloque jamais la complétude).
+ *
+ * Conséquence assumée (signalée en revue) : un devoir "à rendre" échéant
+ * demain apparaît à DEUX endroits distincts et indépendants -- injecté comme
+ * objet cochable dans son groupe Sac (Story 2.5, `sourceType =
+ * DEVOIR_A_RENDRE`) ET comme ligne "fait/pas fait" dans `devoirsARendreDemain`
+ * ci-dessus (`Devoir.done`, Story 2.4). Les deux cases sont réellement
+ * distinctes (AD-3 : jamais la même clé), donc les DEUX doivent être cochées
+ * pour que ce devoir n'empêche plus la complétude -- ni l'une ni l'autre
+ * seule ne suffit. Voir `data/day-completion.test.ts` pour un cas
+ * d'intégration explicite.
+ */
+export function computeSoirCompletion(input: SoirCompletionInput): boolean {
+  const sacItems = input.sacGroups.flatMap((group) => group.items);
+  const sacComplete = isBlockComplete(sacItems);
+  const revisionsComplete = isBlockComplete(input.revisionsItems);
+  const devoirsComplete = input.devoirsARendreDemain.every(
+    (devoir) => devoir.done
+  );
+
+  return sacComplete && revisionsComplete && devoirsComplete;
+}

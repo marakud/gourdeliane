@@ -21,6 +21,7 @@ import {
   updateSubjectItem as updateSubjectItemData,
   upsertChecklistItemState,
 } from "@/data/checklist";
+import { recomputeAndPersistSoirCompletion } from "@/data/day-completion";
 
 // Toute mutation du sac/des objets par matière passe par ce fichier (AD-1).
 // Chaque action retourne { ok: true, data } | { ok: false, error } -- jamais
@@ -53,6 +54,20 @@ function revalidateAccueil() {
 
 function revalidateReglages() {
   safeRevalidate("/reglages");
+}
+
+// Story 2.7 -- même raisonnement que `safeRevalidate` ci-dessus : le
+// recalcul/persistance de la complétude "Ce soir" (AD-5) est un
+// enregistrement de bord (le futur Streak, Epic 4, pas encore construit) qui
+// ne doit jamais transformer une coche déjà réussie en `{ ok: false }` côté
+// UI -- sans quoi un bug dans ce recalcul ferait annuler visuellement (par
+// l'optimistic update) une case pourtant bien enregistrée en base.
+async function safeRecomputeSoirCompletion(userId: string) {
+  try {
+    await recomputeAndPersistSoirCompletion(userId, new Date());
+  } catch (error) {
+    console.error("recomputeAndPersistSoirCompletion failed:", error);
+  }
 }
 
 /**
@@ -116,17 +131,31 @@ export async function toggleChecklistItem(
     return { ok: false, error: "Type d'objet invalide." };
   }
 
+  const resolvedChecklistType = input.checklistType ?? CHECKLIST_TYPE_SAC;
+
   try {
     const user = await ensureSeedUser();
     await upsertChecklistItemState({
       userId: user.id,
       date,
-      checklistType: input.checklistType ?? CHECKLIST_TYPE_SAC,
+      checklistType: resolvedChecklistType,
       sourceType: input.sourceType ?? CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
       sourceId: input.sourceId,
       checked: input.checked,
     });
     revalidateAccueil();
+    // Story 2.7 (AD-5) -- Sac et Révisions font partie du moment "Ce soir" ;
+    // Matin/Retour n'y participent pas (Never de la spec 2.7), pas de
+    // recalcul pour ces deux-là. Appelé APRÈS le retour `{ ok: true }`
+    // décidé (via safeRecomputeSoirCompletion, qui avale ses propres
+    // erreurs) : la coche elle-même a déjà réussi à ce stade, ce recalcul ne
+    // doit jamais la remettre en cause.
+    if (
+      resolvedChecklistType === CHECKLIST_TYPE_SAC ||
+      resolvedChecklistType === CHECKLIST_TYPE_REVISIONS
+    ) {
+      await safeRecomputeSoirCompletion(user.id);
+    }
     return { ok: true, data: null };
   } catch (error) {
     console.error("toggleChecklistItem failed:", error);

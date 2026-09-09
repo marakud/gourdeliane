@@ -8,6 +8,7 @@ import {
   toggleDevoirDone,
   updateDevoir,
 } from "@/data/homework";
+import { recomputeAndPersistSoirCompletion } from "@/data/day-completion";
 import {
   DEFAULT_FREE_WINDOW_END,
   DEFAULT_FREE_WINDOW_START,
@@ -56,6 +57,19 @@ function revalidateEdt() {
   // afficher -- toute mutation doit donc aussi revalider "/edt", pas
   // seulement Accueil.
   safeRevalidate("/edt");
+}
+
+// Story 2.7 -- même raisonnement que `safeRevalidate` ci-dessus : le
+// recalcul/persistance de la complétude "Ce soir" (AD-5) est un
+// enregistrement de bord (le futur Streak, Epic 4, pas encore construit) qui
+// ne doit jamais transformer une bascule "fait" déjà réussie en
+// `{ ok: false }` côté UI.
+async function safeRecomputeSoirCompletion(userId: string) {
+  try {
+    await recomputeAndPersistSoirCompletion(userId, new Date());
+  } catch (error) {
+    console.error("recomputeAndPersistSoirCompletion failed:", error);
+  }
 }
 
 export interface DevoirFormInput {
@@ -262,6 +276,14 @@ export async function toggleDevoirDoneAction(
     await toggleDevoirDone(input.id, user.id, input.done);
     revalidateAccueil();
     revalidateEdt();
+    // Story 2.7 (AD-5) -- un devoir "à rendre" échéant demain fait partie de
+    // la complétude du moment "Ce soir" ; recalculée après chaque bascule
+    // fait/pas fait, même si ce devoir précis ne s'avère pas concerné (le
+    // recalcul relit l'état réel, jamais un calcul partiel). Appelé APRÈS
+    // le retour `{ ok: true }` décidé (via safeRecomputeSoirCompletion, qui
+    // avale ses propres erreurs) : la bascule elle-même a déjà réussi à ce
+    // stade, ce recalcul ne doit jamais la remettre en cause.
+    await safeRecomputeSoirCompletion(user.id);
     return { ok: true, data: null };
   } catch (error) {
     console.error("toggleDevoirDoneAction failed:", error);

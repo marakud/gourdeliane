@@ -8,6 +8,8 @@ import {
   CHECKLIST_TYPE_MATIN,
   DEFAULT_MATIN_ITEMS,
 } from "../domain/checklist";
+import { DAY_COMPLETION_MOMENT_SOIR } from "../domain/day-completion";
+import { getTodaySchoolDate, schoolDateToIso } from "../domain/school-day";
 import {
   createRetourChecklistItem,
   toggleChecklistItem,
@@ -49,6 +51,22 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  // Story 2.7 -- `toggleChecklistItem`/`toggleRevisionsChecklistItem`
+  // appellent désormais `recomputeAndPersistSoirCompletion` sur le VRAI
+  // utilisateur (`ensureSeedUser()`, jamais un userId synthétique ici) avec
+  // `new Date()` -- chaque test ci-dessus écrit donc aussi une ligne
+  // `DayCompletion` (SOIR, aujourd'hui réel) sur la vraie base de dev.
+  // Nettoyée ici plutôt que laissée s'accumuler à chaque exécution de la
+  // suite (correctif de revue).
+  const user = await ensureSeedUser();
+  const todayIso = schoolDateToIso(getTodaySchoolDate(new Date()));
+  await prisma.dayCompletion.deleteMany({
+    where: {
+      userId: user.id,
+      date: new Date(`${todayIso}T00:00:00.000Z`),
+      moment: DAY_COMPLETION_MOMENT_SOIR,
+    },
+  });
   await prisma.$disconnect();
 });
 
