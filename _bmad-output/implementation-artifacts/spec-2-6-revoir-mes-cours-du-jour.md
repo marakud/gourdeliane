@@ -2,7 +2,7 @@
 title: 'Story 2.6 — Revoir mes cours du jour'
 type: 'feature'
 created: '2026-09-09'
-status: 'review'
+status: 'done'
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
@@ -95,6 +95,8 @@ baseline_commit: '7e82c8e993687d4c3ee229fd614f792dd77cff1'
   - Ajout temporaire d'un `NoSchoolDay` sur aujourd'hui -> le bloc "Révisions du jour" disparaît entièrement (aucune carte, aucun message), retiré après vérification.
   - Ajout temporaire d'un créneau Anglais aujourd'hui -> "Revoir le cours d'Anglais" (élision correcte), retiré après vérification.
 - 3-layer adversarial review (blind-hunter, edge-case-hunter, verification-gap) exécutée en parallèle sur le diff complet. Corrigé : libellé "de"/"d'" (élision française, défaut réel visible utilisateur), test de déduplication manquant explicitement demandé par les Tasks de cette spec, type `RevisionsChecklistItemView` incomplet (`sourceType` manquant), commentaire attribuant à tort une optimisation au Boundaries de la spec, typage fragile du 5e élément du `Promise.all` (page.tsx). Différé vers `deferred-work.md` (patterns pré-existants, hors périmètre de cette story) : validation par paire checklistType/sourceType (5e occurrence du gap déjà loggé depuis Story 2.3), duplication de la logique de dérivation du jour aujourd'hui/demain, état optimiste non resynchronisé après revalidation (pattern hérité de SacChecklist/FixedChecklist), absence de test de rendu de page (gap déjà loggé, anticipait explicitement ce scénario), absence de région `aria-live`.
+
+**Confirmé en production par l'utilisateur ("oui ca marche").**
 
 ## Suggested Review Order
 
