@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { SlotRow } from "@/components/schedule/slot-row";
 import { SlotFormDialog } from "@/components/schedule/slot-form-dialog";
 import { NoSchoolDayPanel } from "@/components/schedule/no-school-day-panel";
+import { WeekGrid } from "@/components/schedule/week-grid";
 import { WEEKDAYS, WEEKDAY_LABELS, type WeekParity, type Weekday } from "@/domain/schedule";
 
 export interface WeekScheduleSlot {
@@ -48,12 +49,16 @@ export function WeekSchedule({
         </p>
       )}
 
-      {/* Vue semaine : une colonne empilée sur mobile ; à partir de la
-          tablette (>= md, 768px), grille semaine complète (UX-DR13) --
-          largeur de colonne minimale fixe (auto-fill) plutôt qu'un nombre de
-          colonnes figé, pour que les 7 jours se répartissent naturellement
-          sans jamais retomber sous le plancher de tap de 44px. */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-[repeat(auto-fill,minmax(160px,1fr))]">
+      {/* Grille horaire réelle à partir de la tablette (>= md, 768px, Story
+          1.5) -- écran trop étroit en dessous pour une grille lisible, la
+          vue liste ci-dessous reste alors la seule vue (UX-DR13). */}
+      <div className="hidden md:block">
+        <WeekGrid slots={slots} subjectNames={subjectNames} />
+      </div>
+
+      {/* Vue liste : une colonne empilée, mobile uniquement (< md) --
+          inchangée depuis la Story 1.2/1.4, cf. Design Notes spec 1.5. */}
+      <div className="flex flex-col gap-4 md:hidden">
         {WEEKDAYS.map((day) => {
           // Tri stable horaire puis parité (Story 1.4) : désambiguïse deux
           // matières au même jour+horaire (semaine A puis B), ordre

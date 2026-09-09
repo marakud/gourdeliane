@@ -132,6 +132,16 @@ export function assignNextColorIndex(
   return (highest % SUBJECT_COLOR_COUNT) + 1;
 }
 
+/**
+ * Ramène un `colorIndex` dans [1, 8] (palette cyclique au-delà de 8, AD-6) --
+ * partagée entre `components/schedule/subject-tag.tsx` et
+ * `components/schedule/week-grid.tsx` (correctif de revue : les deux
+ * dupliquaient la même formule indépendamment).
+ */
+export function normalizeSubjectColorIndex(colorIndex: number): number {
+  return ((((colorIndex - 1) % SUBJECT_COLOR_COUNT) + SUBJECT_COLOR_COUNT) % SUBJECT_COLOR_COUNT) + 1;
+}
+
 export interface ScheduleSlotInput {
   weekday: string;
   startTime: string;
@@ -347,4 +357,92 @@ export function computeWeeklyFreeGaps(
     result[day] = computeFreeGaps(byDay.get(day) ?? [], windowStart, windowEnd);
   }
   return result;
+}
+
+// Positionnement d'une grille horaire réelle (Story 1.5, refonte visuelle de
+// la vue Semaine ≥768px) : convertit "HH:mm" en minutes depuis minuit pour
+// calculer où et sur quelle hauteur positionner chaque créneau.
+
+/** "HH:mm" -> minutes depuis minuit. Suppose une chaîne déjà valide
+ * (TIME_PATTERN) -- pas de garde ici, mêmes conventions que le reste de ce
+ * fichier (appelants internes uniquement, jamais d'entrée utilisateur brute). */
+export function timeToMinutes(time: string): number {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function minutesToTime(totalMinutes: number): string {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+export const DEFAULT_GRID_WINDOW_START = "08:00";
+export const DEFAULT_GRID_WINDOW_END = "18:00";
+
+export interface GridWindow {
+  start: string;
+  end: string;
+}
+
+/**
+ * Calcule la fenêtre horaire de la grille (Story 1.5) : la plage par défaut
+ * (8h-18h), élargie à l'heure pleine la plus proche si un créneau réel
+ * déborde -- jamais figée, pour rester lisible avec peu de données tout en
+ * s'adaptant à un emploi du temps réel qui commence plus tôt ou finit plus
+ * tard.
+ */
+export function computeGridWindow(
+  slots: readonly { startTime: string; endTime: string }[],
+  defaultStart: string = DEFAULT_GRID_WINDOW_START,
+  defaultEnd: string = DEFAULT_GRID_WINDOW_END
+): GridWindow {
+  let startMinutes = timeToMinutes(defaultStart);
+  let endMinutes = timeToMinutes(defaultEnd);
+
+  for (const slot of slots) {
+    const slotStart = timeToMinutes(slot.startTime);
+    const slotEnd = timeToMinutes(slot.endTime);
+    if (slotStart < startMinutes) {
+      startMinutes = Math.floor(slotStart / 60) * 60;
+    }
+    if (slotEnd > endMinutes) {
+      endMinutes = Math.ceil(slotEnd / 60) * 60;
+    }
+  }
+
+  return { start: minutesToTime(startMinutes), end: minutesToTime(endMinutes) };
+}
+
+export interface SlotLayout {
+  topPercent: number;
+  heightPercent: number;
+}
+
+/**
+ * Position/hauteur (en % de la fenêtre) d'un créneau dans la grille -- pure,
+ * ne connaît rien du rendu (la hauteur minimale tapable d'une case très
+ * courte se gère en CSS côté composant, pas ici). Rogné à [0, 100] : un
+ * créneau qui déborderait malgré tout de la fenêtre fournie (ex. appelant
+ * n'ayant pas élargi via `computeGridWindow` sur les mêmes créneaux) ne
+ * produit jamais de position/hauteur négative ou hors bornes.
+ */
+export function computeSlotLayout(
+  slot: { startTime: string; endTime: string },
+  windowStart: string,
+  windowEnd: string
+): SlotLayout {
+  const windowStartMinutes = timeToMinutes(windowStart);
+  const windowEndMinutes = timeToMinutes(windowEnd);
+  const totalMinutes = windowEndMinutes - windowStartMinutes;
+
+  const rawTop =
+    ((timeToMinutes(slot.startTime) - windowStartMinutes) / totalMinutes) * 100;
+  const rawBottom =
+    ((timeToMinutes(slot.endTime) - windowStartMinutes) / totalMinutes) * 100;
+
+  const topPercent = Math.max(0, Math.min(100, rawTop));
+  const bottomPercent = Math.max(0, Math.min(100, rawBottom));
+
+  return { topPercent, heightPercent: bottomPercent - topPercent };
 }

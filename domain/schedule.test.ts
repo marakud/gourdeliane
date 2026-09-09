@@ -2,16 +2,33 @@ import { describe, expect, it } from "vitest";
 import {
   assignNextColorIndex,
   computeFreeGaps,
+  computeGridWindow,
+  computeSlotLayout,
   computeWeeklyFreeGaps,
   computeWeekParity,
   dedupeSubjectsFromSlots,
   deriveDaySlots,
   mondayOfIso,
+  normalizeSubjectColorIndex,
   shiftIsoDays,
+  timeToMinutes,
   validateSlot,
   type DaySlot,
   type SubjectRef,
 } from "./schedule";
+
+describe("normalizeSubjectColorIndex (AD-6, palette cyclique)", () => {
+  it("leaves an index already inside [1, 8] unchanged", () => {
+    expect(normalizeSubjectColorIndex(1)).toBe(1);
+    expect(normalizeSubjectColorIndex(8)).toBe(8);
+  });
+
+  it("wraps an index beyond 8 back into [1, 8]", () => {
+    expect(normalizeSubjectColorIndex(9)).toBe(1);
+    expect(normalizeSubjectColorIndex(16)).toBe(8);
+    expect(normalizeSubjectColorIndex(17)).toBe(1);
+  });
+});
 
 describe("assignNextColorIndex (AD-6)", () => {
   it("assigns colorIndex 1 to the first subject", () => {
@@ -345,5 +362,115 @@ describe("computeWeeklyFreeGaps (spec 2.4 amendment -- lundi à dimanche)", () =
     for (const day of ["MONDAY", "SATURDAY", "SUNDAY"] as const) {
       expect(result[day]).toEqual([{ start: "08:00", end: "22:00" }]);
     }
+  });
+});
+
+describe("timeToMinutes (Story 1.5 -- grille EDT)", () => {
+  it("converts midnight to 0", () => {
+    expect(timeToMinutes("00:00")).toBe(0);
+  });
+
+  it("converts a mid-morning time", () => {
+    expect(timeToMinutes("08:30")).toBe(510);
+  });
+
+  it("converts the last minute of the day", () => {
+    expect(timeToMinutes("23:59")).toBe(1439);
+  });
+});
+
+describe("computeGridWindow (Story 1.5)", () => {
+  it("returns the default window when there are no slots", () => {
+    expect(computeGridWindow([])).toEqual({ start: "08:00", end: "18:00" });
+  });
+
+  it("keeps the default window when every slot fits inside it", () => {
+    const result = computeGridWindow([{ startTime: "09:00", endTime: "10:00" }]);
+    expect(result).toEqual({ start: "08:00", end: "18:00" });
+  });
+
+  it("widens the start to the hour below for a slot starting earlier", () => {
+    const result = computeGridWindow([{ startTime: "07:15", endTime: "09:00" }]);
+    expect(result.start).toBe("07:00");
+  });
+
+  it("widens the end to the hour above for a slot ending later", () => {
+    const result = computeGridWindow([{ startTime: "17:00", endTime: "18:45" }]);
+    expect(result.end).toBe("19:00");
+  });
+
+  it("widens both bounds independently across multiple slots", () => {
+    const result = computeGridWindow([
+      { startTime: "07:30", endTime: "09:00" },
+      { startTime: "16:00", endTime: "19:15" },
+    ]);
+    expect(result).toEqual({ start: "07:00", end: "20:00" });
+  });
+
+  it("respects a custom default window", () => {
+    const result = computeGridWindow([], "07:00", "17:00");
+    expect(result).toEqual({ start: "07:00", end: "17:00" });
+  });
+});
+
+describe("computeSlotLayout (Story 1.5)", () => {
+  it("positions a slot at the very start of the window", () => {
+    const result = computeSlotLayout(
+      { startTime: "08:00", endTime: "09:00" },
+      "08:00",
+      "18:00"
+    );
+    expect(result.topPercent).toBe(0);
+    expect(result.heightPercent).toBe(10);
+  });
+
+  it("positions a slot in the middle of the window", () => {
+    const result = computeSlotLayout(
+      { startTime: "13:00", endTime: "14:00" },
+      "08:00",
+      "18:00"
+    );
+    expect(result.topPercent).toBe(50);
+    expect(result.heightPercent).toBe(10);
+  });
+
+  it("positions a slot ending exactly at the window end", () => {
+    const result = computeSlotLayout(
+      { startTime: "17:00", endTime: "18:00" },
+      "08:00",
+      "18:00"
+    );
+    expect(result.topPercent).toBe(90);
+    expect(result.heightPercent).toBe(10);
+  });
+
+  it("clips a slot that starts before the window to the window start", () => {
+    const result = computeSlotLayout(
+      { startTime: "06:00", endTime: "09:00" },
+      "08:00",
+      "18:00"
+    );
+    expect(result.topPercent).toBe(0);
+    expect(result.heightPercent).toBe(10);
+  });
+
+  it("clips a slot that ends after the window to the window end", () => {
+    const result = computeSlotLayout(
+      { startTime: "17:00", endTime: "20:00" },
+      "08:00",
+      "18:00"
+    );
+    expect(result.topPercent).toBe(90);
+    expect(result.heightPercent).toBe(10);
+  });
+
+  it("produces zero height for a slot entirely outside the window", () => {
+    const result = computeSlotLayout(
+      { startTime: "19:00", endTime: "20:00" },
+      "08:00",
+      "18:00"
+    );
+    expect(result.topPercent).toBe(100);
+    expect(result.heightPercent).toBe(0);
   });
 });

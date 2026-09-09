@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { normalizeSubjectColorIndex } from "@/domain/schedule";
 
 // Pastille de matière (UX-DR7) : disque coloré 32px réutilisé entre l'EDT,
 // la checklist du soir et les devoirs (DESIGN.md, subject-tag). La couleur
@@ -24,7 +25,7 @@ export function SubjectTag({ name, colorIndex, className }: SubjectTagProps) {
   // Palette cyclique au-delà de 8 (AD-6) : on ramène toujours l'index dans
   // [1, 8] pour piocher un token CSS existant, même pour une très vieille
   // matière dont l'index brut a dépassé 8.
-  const safeIndex = ((((colorIndex - 1) % 8) + 8) % 8) + 1;
+  const safeIndex = normalizeSubjectColorIndex(colorIndex);
 
   return (
     <span

@@ -32,7 +32,12 @@ import {
   type WeekParity,
   type Weekday,
 } from "@/domain/schedule";
-import { createSlot, updateSlot, type SlotFormInput } from "@/actions/schedule";
+import {
+  createSlot,
+  deleteSlot,
+  updateSlot,
+  type SlotFormInput,
+} from "@/actions/schedule";
 
 export interface SlotFormDialogProps {
   trigger: ReactElement;
@@ -49,6 +54,14 @@ export interface SlotFormDialogProps {
   // Pré-remplit le jour à la création depuis la colonne où l'enfant a tapé
   // "Ajouter" -- évite de le resélectionner à chaque créneau.
   defaultWeekday?: Weekday;
+  // Story 1.5 -- opt-in explicite (jamais activé par défaut) : seule la
+  // grille (week-grid.tsx) en a besoin, ses cases n'ayant pas la place pour
+  // une icône corbeille séparée comme SlotRow (vue liste). Sans ce garde,
+  // le bouton apparaissait aussi dans SlotRow (qui passe déjà `slot`, donc
+  // `isEdit` vrai) -- un second bouton de suppression redondant avec
+  // l'icône corbeille existante, et dont les erreurs n'étaient jamais
+  // remontées à la bannière d'erreur de la page (correctif de revue).
+  showDeleteButton?: boolean;
 }
 
 const EMPTY_FORM: SlotFormInput = {
@@ -85,6 +98,7 @@ export function SlotFormDialog({
   existingSubjectNames,
   slot,
   defaultWeekday,
+  showDeleteButton = false,
 }: SlotFormDialogProps) {
   const isEdit = Boolean(slot);
   const [open, setOpen] = useState(false);
@@ -110,6 +124,24 @@ export function SlotFormDialog({
         ? await updateSlot(slot!.id, form)
         : await createSlot(form);
 
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setOpen(false);
+    });
+  }
+
+  // Bouton "Supprimer" (Story 1.5 -- la grille n'a pas la place pour deux
+  // icônes séparées modifier/supprimer comme la vue liste, SlotRow) : même
+  // Server Action que l'icône corbeille de la vue liste, ferme le dialogue
+  // au succès, garde le dialogue ouvert avec un message en cas d'échec.
+  function handleDelete() {
+    if (!slot) return;
+    setError(null);
+
+    startTransition(async () => {
+      const result = await deleteSlot(slot.id);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -247,9 +279,21 @@ export function SlotFormDialog({
           )}
 
           <DialogFooter>
+            {isEdit && showDeleteButton && (
+              <Button
+                type="button"
+                variant="outline"
+                disabled={isPending}
+                onClick={handleDelete}
+                className="h-11 min-w-[44px] text-destructive hover:text-destructive sm:mr-auto"
+              >
+                Supprimer
+              </Button>
+            )}
             <Button
               type="button"
               variant="outline"
+              disabled={isPending}
               className="h-11 min-w-[44px]"
               onClick={() => setOpen(false)}
             >
