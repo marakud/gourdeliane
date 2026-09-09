@@ -2,7 +2,7 @@
 title: 'Retour utilisateur — Accueil : afficher un seul moment contextuel'
 type: 'feature'
 created: '2026-09-09'
-status: 'review'
+status: 'done'
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-2-7-voir-ma-soiree-organisee-en-3-blocs.md'
@@ -105,6 +105,8 @@ baseline_commit: 'c0eb365fb920024f96a56b0b0540ab178ed32c16'
   - "Ce matin"/"Retour" avec `hideTitle` : aucun espace vide visible au-dessus du compteur ou du message "Aucun item...".
   - État restauré à l'identique après vérification (0/1, 0/2, 0/1).
 - 3-layer adversarial review (blind-hunter, edge-case-hunter, verification-gap) exécutée en parallèle sur le diff complet (511 lignes). Corrigé : régression de hiérarchie de titres (`<h1>` -> `<h3>`, niveau manquant), perte de landmark sans alternative accessible (titre `sr-only` réintroduit), un vrai bug de rejeu d'animation de célébration causé par le montage permanent des panneaux d'onglets, `MomentTabs` ne suivait jamais un changement de moment après le montage initial, espace vide au-dessus du message "Aucun item" quand `hideTitle` et liste vide. Différé vers `deferred-work.md` (hors périmètre ou risque déjà accepté ailleurs) : absence de test sur le branchement `getCurrentMoment` -> `page.tsx` -> `MomentTabs` (gap déjà loggé pour tout le repo), risque de permutation de props `ReactNode` sur `MomentTabs` (même catégorie que `FixedChecklist`/`FixedItemsManager`), garde-fou `% 24` non testé (cas ICU jamais observé en pratique), extension de `hideTitle` à `FixedChecklist` non explicitement nommée dans le frozen Boundaries d'origine.
+
+**Confirmé en production par l'utilisateur ("ca marche").**
 
 ## Suggested Review Order
 

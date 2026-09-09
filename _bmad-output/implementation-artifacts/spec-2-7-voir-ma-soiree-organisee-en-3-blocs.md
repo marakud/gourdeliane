@@ -2,7 +2,7 @@
 title: 'Story 2.7 — Voir ma soirée organisée en 3 blocs et savoir quand elle est terminée'
 type: 'feature'
 created: '2026-09-09'
-status: 'review'
+status: 'done'
 review_loop_iteration: 0
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/epic-2-context.md'
@@ -112,6 +112,8 @@ baseline_commit: 'b8db9655c6698dfb772baafc43d303f7bb5aab32'
   - Décoché un item -> badge disparu ; `DayCompletion` (SOIR, aujourd'hui) vérifié en base : `complete=false` puis `complete=true` après recoché.
   - Retesté le chemin heureux d'un toggle Sac après le correctif du `try/catch` (safeRecomputeSoirCompletion) -- coche/décoche toujours fonctionnelles, aucune régression.
 - 3-layer adversarial review (blind-hunter, edge-case-hunter, verification-gap) exécutée en parallèle sur le diff complet (809 lignes). Corrigé : le recalcul de complétude partageait le `try/catch` de la mutation principale (risque de "phantom exception" -- une coche réussie signalée comme échouée), `recomputeAndPersistSoirCompletion` rappelait `ensureSeedUser()` au lieu de relire `userId`, absence totale de test pour la couche de persistance (`data/day-completion.test.ts` créé, 5 cas dont le scénario à deux cases indépendantes), hiérarchie de titres incohérente après le regroupement visuel (`<h2>`→`<h3>` sans descendre le sous-titre imbriqué), landmarks ARIA redondants (4 `<section>` imbriquées pour une seule carte visuelle), type `moment: string` non contraint, pollution de `DayCompletion` sur la vraie base par les tests d'action (nettoyage ajouté). Différé vers `deferred-work.md` (hors périmètre de cette story ou risque déjà accepté ailleurs) : absence de ligne `DayCompletion` pour une soirée complète sans aucune coche (écrire depuis le rendu serait un anti-pattern Next.js), lectures-puis-écriture non transactionnelles dans `recomputeAndPersistSoirCompletion` (fenêtre de course étroite, catégorie de risque déjà acceptée ailleurs), `createDevoirAction`/`updateDevoirAction`/`deleteDevoirAction` ne recalculant pas (limite de périmètre explicite du Code Map), absence de test de rendu pour `MomentSoirCard` (gap déjà loggé pour tout le repo).
+
+**Confirmé en production par l'utilisateur ("ca marche").**
 
 ## Suggested Review Order
 
