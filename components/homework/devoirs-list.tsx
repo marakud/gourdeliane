@@ -208,7 +208,7 @@ export function DevoirsList({
                     onClick={() => handleToggle(devoir.id)}
                     aria-pressed={checked}
                     disabled={pendingIds.has(devoir.id)}
-                    className="flex min-h-[44px] flex-1 items-center gap-3 rounded-xl bg-muted px-3 py-2 text-left disabled:opacity-60"
+                    className="flex min-h-[44px] min-w-0 flex-1 items-center gap-3 rounded-xl bg-muted px-3 py-2 text-left disabled:opacity-60"
                   >
                     <span
                       aria-hidden="true"
