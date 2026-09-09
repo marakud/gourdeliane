@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
   CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
   CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
   CHECKLIST_TYPE_MATIN,
@@ -7,8 +8,10 @@ import {
   DEFAULT_RETOUR_ITEMS,
   deriveFixedChecklist,
   deriveSacChecklist,
+  partitionDevoirsARendreForSac,
   type ChecklistItemStateInput,
   type ChecklistSubjectGroupInput,
+  type DevoirARendreInput,
   type FixedChecklistItemInput,
 } from "./checklist";
 
@@ -33,8 +36,18 @@ describe("deriveSacChecklist (spec 2.1 I/O matrix)", () => {
       {
         subject: MATHS,
         items: [
-          { sourceId: "item-cahier", label: "Cahier de maths", checked: false },
-          { sourceId: "item-calc", label: "Calculatrice", checked: false },
+          {
+            sourceId: "item-cahier",
+            sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
+            label: "Cahier de maths",
+            checked: false,
+          },
+          {
+            sourceId: "item-calc",
+            sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
+            label: "Calculatrice",
+            checked: false,
+          },
         ],
       },
     ]);
@@ -87,6 +100,7 @@ describe("deriveSacChecklist (spec 2.1 I/O matrix)", () => {
 
     expect(result[0].items[0]).toEqual({
       sourceId: "item-cahier",
+      sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
       label: "Nouveau libellé",
       checked: true,
     });
@@ -113,8 +127,18 @@ describe("deriveSacChecklist (spec 2.1 I/O matrix)", () => {
     const result = deriveSacChecklist(groups, states);
 
     expect(result[0].items).toEqual([
-      { sourceId: "item-cahier", label: "Cahier de maths", checked: true },
-      { sourceId: "item-nouveau", label: "Trousse", checked: false },
+      {
+        sourceId: "item-cahier",
+        sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
+        label: "Cahier de maths",
+        checked: true,
+      },
+      {
+        sourceId: "item-nouveau",
+        sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
+        label: "Trousse",
+        checked: false,
+      },
     ]);
   });
 
@@ -133,7 +157,12 @@ describe("deriveSacChecklist (spec 2.1 I/O matrix)", () => {
     const result = deriveSacChecklist(groups, states);
 
     expect(result[0].items).toEqual([
-      { sourceId: "item-still-here", label: "Cahier", checked: false },
+      {
+        sourceId: "item-still-here",
+        sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
+        label: "Cahier",
+        checked: false,
+      },
     ]);
   });
 
@@ -149,6 +178,214 @@ describe("deriveSacChecklist (spec 2.1 I/O matrix)", () => {
 
     expect(result[0].items[0].checked).toBe(false);
   });
+
+  describe("devoir « à rendre » injecté dans le groupe (Story 2.5, FR-18)", () => {
+    it("mixes a SubjectItem and a devoir à rendre in the same group, each carrying its own sourceType", () => {
+      const groups: ChecklistSubjectGroupInput[] = [
+        {
+          subject: MATHS,
+          items: [
+            { id: "item-cahier", label: "Cahier de maths" },
+            {
+              id: "devoir-1",
+              label: "Exercices p.42 à rendre",
+              sourceType: CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
+            },
+          ],
+        },
+      ];
+
+      const result = deriveSacChecklist(groups, []);
+
+      expect(result[0].items).toEqual([
+        {
+          sourceId: "item-cahier",
+          sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
+          label: "Cahier de maths",
+          checked: false,
+        },
+        {
+          sourceId: "devoir-1",
+          sourceType: CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
+          label: "Exercices p.42 à rendre",
+          checked: false,
+        },
+      ]);
+    });
+
+    it("checks a devoir à rendre independently from a SubjectItem checked state, even with the same id", () => {
+      // Cas limite volontaire (aucun risque réel avec des cuid(), la clé
+      // composite le garantit explicitement plutôt que par convention).
+      const groups: ChecklistSubjectGroupInput[] = [
+        {
+          subject: MATHS,
+          items: [
+            { id: "same-id", label: "Cahier de maths" },
+            {
+              id: "same-id",
+              label: "Exercices p.42 à rendre",
+              sourceType: CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
+            },
+          ],
+        },
+      ];
+      const states: ChecklistItemStateInput[] = [
+        {
+          sourceType: CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
+          sourceId: "same-id",
+          checked: true,
+        },
+      ];
+
+      const result = deriveSacChecklist(groups, states);
+
+      expect(result[0].items[0].checked).toBe(true); // SubjectItem
+      expect(result[0].items[1].checked).toBe(false); // devoir à rendre, non affecté
+    });
+
+    it("reflects a checked state for a devoir à rendre without affecting Devoir.done (état séparé, AD-7)", () => {
+      const groups: ChecklistSubjectGroupInput[] = [
+        {
+          subject: MATHS,
+          items: [
+            {
+              id: "devoir-2",
+              label: "Feuille de SVT à rendre",
+              sourceType: CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
+            },
+          ],
+        },
+      ];
+      const states: ChecklistItemStateInput[] = [
+        {
+          sourceType: CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
+          sourceId: "devoir-2",
+          checked: true,
+        },
+      ];
+
+      const result = deriveSacChecklist(groups, states);
+
+      expect(result[0].items[0].checked).toBe(true);
+      expect(result[0].items[0].sourceType).toBe(CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE);
+    });
+  });
+});
+
+describe("partitionDevoirsARendreForSac (Story 2.5, FR-18)", () => {
+  function devoir(overrides: Partial<DevoirARendreInput>): DevoirARendreInput {
+    return {
+      id: "devoir-1",
+      subjectId: MATHS.id,
+      description: "Exercices p.42",
+      aRendre: true,
+      echeanceIso: "2026-09-10",
+      ...overrides,
+    };
+  }
+
+  const TOMORROW = "2026-09-10";
+  const SUBJECTS_WITH_SAC_GROUP = new Set([MATHS.id]);
+
+  it("injects a devoir à rendre due tomorrow into its subject's item list and marks it consumed", () => {
+    const result = partitionDevoirsARendreForSac(
+      [devoir({})],
+      TOMORROW,
+      SUBJECTS_WITH_SAC_GROUP
+    );
+
+    expect(result.itemsBySubjectId.get(MATHS.id)).toEqual([
+      {
+        id: "devoir-1",
+        label: "Exercices p.42 à rendre",
+        sourceType: CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
+      },
+    ]);
+    expect(result.consumedIds.has("devoir-1")).toBe(true);
+  });
+
+  it("does not inject a devoir à rendre whose subject has no Sac group (no class tomorrow) -- not consumed either", () => {
+    const result = partitionDevoirsARendreForSac(
+      [devoir({ subjectId: EPS.id })],
+      TOMORROW,
+      SUBJECTS_WITH_SAC_GROUP // EPS absent
+    );
+
+    expect(result.itemsBySubjectId.has(EPS.id)).toBe(false);
+    expect(result.consumedIds.size).toBe(0);
+  });
+
+  it("ignores a devoir not marked à rendre even if due tomorrow", () => {
+    const result = partitionDevoirsARendreForSac(
+      [devoir({ aRendre: false })],
+      TOMORROW,
+      SUBJECTS_WITH_SAC_GROUP
+    );
+
+    expect(result.itemsBySubjectId.size).toBe(0);
+    expect(result.consumedIds.size).toBe(0);
+  });
+
+  it("ignores a devoir à rendre with no échéance", () => {
+    const result = partitionDevoirsARendreForSac(
+      [devoir({ echeanceIso: null })],
+      TOMORROW,
+      SUBJECTS_WITH_SAC_GROUP
+    );
+
+    expect(result.itemsBySubjectId.size).toBe(0);
+  });
+
+  it("ignores a devoir à rendre whose échéance isn't precisely tomorrow", () => {
+    const result = partitionDevoirsARendreForSac(
+      [devoir({ echeanceIso: "2026-09-20" })],
+      TOMORROW,
+      SUBJECTS_WITH_SAC_GROUP
+    );
+
+    expect(result.itemsBySubjectId.size).toBe(0);
+  });
+
+  it("accumulates multiple devoirs à rendre for the same subject", () => {
+    const result = partitionDevoirsARendreForSac(
+      [
+        devoir({ id: "devoir-1", description: "Exercices p.42" }),
+        devoir({ id: "devoir-2", description: "Feuille de géométrie" }),
+      ],
+      TOMORROW,
+      SUBJECTS_WITH_SAC_GROUP
+    );
+
+    expect(result.itemsBySubjectId.get(MATHS.id)?.map((item) => item.id)).toEqual([
+      "devoir-1",
+      "devoir-2",
+    ]);
+    expect(result.consumedIds).toEqual(new Set(["devoir-1", "devoir-2"]));
+  });
+
+  it('suffixes the label with "à rendre"', () => {
+    const result = partitionDevoirsARendreForSac(
+      [devoir({ description: "Exercices p.42" })],
+      TOMORROW,
+      SUBJECTS_WITH_SAC_GROUP
+    );
+
+    expect(result.itemsBySubjectId.get(MATHS.id)?.[0].label).toBe(
+      "Exercices p.42 à rendre"
+    );
+  });
+
+  it('does not duplicate the suffix when the description already mentions "à rendre"', () => {
+    const result = partitionDevoirsARendreForSac(
+      [devoir({ description: "Dossier à rendre" })],
+      TOMORROW,
+      SUBJECTS_WITH_SAC_GROUP
+    );
+
+    expect(result.itemsBySubjectId.get(MATHS.id)?.[0].label).toBe(
+      "Dossier à rendre"
+    );
+  });
 });
 
 describe("deriveFixedChecklist (spec 2.2 I/O matrix)", () => {
@@ -163,10 +400,30 @@ describe("deriveFixedChecklist (spec 2.2 I/O matrix)", () => {
     const result = deriveFixedChecklist(items, []);
 
     expect(result).toEqual([
-      { sourceId: "item-cles", label: "Clés", checked: false },
-      { sourceId: "item-gouter", label: "Goûter", checked: false },
-      { sourceId: "item-carnet", label: "Carnet", checked: false },
-      { sourceId: "item-chargeur", label: "Chargeur", checked: false },
+      {
+        sourceId: "item-cles",
+        sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+        label: "Clés",
+        checked: false,
+      },
+      {
+        sourceId: "item-gouter",
+        sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+        label: "Goûter",
+        checked: false,
+      },
+      {
+        sourceId: "item-carnet",
+        sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+        label: "Carnet",
+        checked: false,
+      },
+      {
+        sourceId: "item-chargeur",
+        sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+        label: "Chargeur",
+        checked: false,
+      },
     ]);
   });
 
@@ -197,6 +454,7 @@ describe("deriveFixedChecklist (spec 2.2 I/O matrix)", () => {
 
     expect(result[0]).toEqual({
       sourceId: "item-cles",
+      sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
       label: "Trousseau de clés",
       checked: true,
     });
@@ -225,7 +483,12 @@ describe("deriveFixedChecklist (spec 2.2 I/O matrix)", () => {
     const result = deriveFixedChecklist(items, states);
 
     expect(result).toEqual([
-      { sourceId: "item-still-here", label: "Carnet", checked: false },
+      {
+        sourceId: "item-still-here",
+        sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+        label: "Carnet",
+        checked: false,
+      },
     ]);
   });
 
@@ -262,6 +525,7 @@ describe("deriveFixedChecklist -- Retour (spec 2.3 I/O matrix, mêmes cas que Ma
     expect(result).toEqual(
       DEFAULT_RETOUR_ITEMS.map((label, index) => ({
         sourceId: `item-retour-${index}`,
+        sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
         label,
         checked: false,
       }))

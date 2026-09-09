@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
   CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
   CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
   CHECKLIST_TYPE_MATIN,
@@ -91,6 +92,7 @@ const KNOWN_CHECKLIST_TYPES = new Set<string>([
 const KNOWN_SOURCE_TYPES = new Set<string>([
   CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
   CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+  CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
 ]);
 
 export async function toggleChecklistItem(

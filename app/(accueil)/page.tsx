@@ -30,6 +30,7 @@ import {
   DEFAULT_RETOUR_ITEMS,
   deriveFixedChecklist,
   deriveSacChecklist,
+  partitionDevoirsARendreForSac,
   type ChecklistSubjectGroupInput,
 } from "@/domain/checklist";
 import { computeDaysRemaining } from "@/domain/homework";
@@ -135,6 +136,34 @@ export default async function AccueilPage() {
   // testé indépendamment de cette page).
   const tomorrowSubjects = dedupeSubjectsFromSlots(tomorrowSlots, subjects);
 
+  // Chargé ici (avant la construction des groupes du Sac, Story 2.5) car un
+  // devoir "à rendre" échéant demain doit pouvoir s'insérer dans le groupe
+  // de sa matière -- seuls les champs bruts (subjectId, aRendre, echeance)
+  // sont nécessaires à ce stade ; le formatage pour "Devoirs"
+  // (echeanceLabel/daysRemaining, qui a besoin de `todayIso`) est fait plus
+  // bas, à partir de ce même tableau (pas de second aller-retour DB).
+  const devoirs = await listDevoirs(user.id);
+
+  // Story 2.5 (FR-18) -- routage pur et testé (domain/checklist.ts), un seul
+  // passage plutôt que deux boucles séparées couplées par un commentaire :
+  // `itemsBySubjectId` (objets à injecter dans le Sac) et `consumedIds`
+  // (exclus de "Devoirs pour demain" plus bas) proviennent de la même
+  // décision, jamais désynchronisables.
+  const { itemsBySubjectId: devoirARendreItemsBySubjectId, consumedIds: devoirsARendreConsumedIds } =
+    partitionDevoirsARendreForSac(
+      devoirs.map((devoir) => ({
+        id: devoir.id,
+        subjectId: devoir.subjectId,
+        description: devoir.description,
+        aRendre: devoir.aRendre,
+        echeanceIso: devoir.echeance
+          ? devoir.echeance.toISOString().slice(0, 10)
+          : null,
+      })),
+      tomorrowIso,
+      new Set(tomorrowSubjects.map((subject) => subject.id))
+    );
+
   let sacGroups: ReturnType<typeof deriveSacChecklist> = [];
   if (tomorrowSubjects.length > 0) {
     const subjectIds = tomorrowSubjects.map((subject) => subject.id);
@@ -159,7 +188,10 @@ export default async function AccueilPage() {
           name: subject.name,
           colorIndex: subject.colorIndex,
         },
-        items: itemsBySubjectId.get(subject.id) ?? [],
+        items: [
+          ...(itemsBySubjectId.get(subject.id) ?? []),
+          ...(devoirARendreItemsBySubjectId.get(subject.id) ?? []),
+        ],
       })
     );
 
@@ -219,8 +251,7 @@ export default async function AccueilPage() {
   // renvoie faits + à faire -- un devoir fait reste affiché (coché), plus
   // jamais retiré de la liste par un filtre (Boundaries spec 2.4 amendée).
   // Échéance/jours-restants formatés ici, côté serveur (AD-4) -- jamais
-  // recalculés côté client.
-  const devoirs = await listDevoirs(user.id);
+  // recalculés côté client. `devoirs` déjà chargé plus haut (Story 2.5).
   const devoirsView = devoirs.map((devoir) => {
     const echeanceIso = devoir.echeance
       ? devoir.echeance.toISOString().slice(0, 10)
@@ -269,9 +300,15 @@ export default async function AccueilPage() {
   // historique -- sans ce filtre, un devoir fini restait affiché et pouvait
   // même déclencher l'affichage de la carte un soir sans cours ni rien à
   // faire (le message "Pas cours demain, profite de ta soirée !" ne
-  // s'affichait plus alors qu'il n'y avait plus rien à préparer).
+  // s'affichait plus alors qu'il n'y avait plus rien à préparer). Un devoir
+  // "à rendre" déjà basculé vers un objet cochable du Sac est également
+  // exclu (Story 2.5, pas de doublon) -- sauf s'il n'a pas pu s'y insérer
+  // (sa matière n'a pas cours demain), auquel cas il reste ici.
   const devoirsForTomorrow = devoirsView.filter(
-    (devoir) => devoir.echeanceIso === tomorrowIso && !devoir.done
+    (devoir) =>
+      devoir.echeanceIso === tomorrowIso &&
+      !devoir.done &&
+      !devoirsARendreConsumedIds.has(devoir.id)
   );
 
   const { dateLabel, timeLabel } = formatGreetingDateTime(now);

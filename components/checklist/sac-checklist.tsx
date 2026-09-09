@@ -18,6 +18,11 @@ import { cn } from "@/lib/utils";
 
 export interface SacChecklistItem {
   sourceId: string;
+  // Story 2.5 -- un groupe peut mélanger des SubjectItem et des devoirs "à
+  // rendre" (sourceType distincts) ; transmis explicitement à
+  // `toggleChecklistItem` au lieu de compter sur son défaut `SUBJECT_ITEM`,
+  // désormais insuffisant.
+  sourceType: string;
   label: string;
   checked: boolean;
 }
@@ -42,58 +47,75 @@ export interface SacChecklistProps {
   dateIso: string;
 }
 
+// Story 2.5 -- un groupe peut mélanger un SubjectItem et un devoir "à
+// rendre" (sourceType distincts) ; l'état local ci-dessous doit donc être
+// keyé par la même clé composite que domain/checklist.ts::deriveSacChecklist
+// (`${sourceType}:${sourceId}`), jamais `sourceId` seul -- sinon deux lignes
+// distinctes qui partageraient un jour un même `sourceId` (improbable avec
+// des cuid(), mais la couche domaine s'en protège explicitement) finiraient
+// par partager un seul état coché/en attente et une seule clé React
+// (correctif de revue).
+function itemKey(sourceType: string, sourceId: string): string {
+  return `${sourceType}:${sourceId}`;
+}
+
 export function SacChecklist({
   groups,
   devoirsForTomorrow = [],
   dateIso,
 }: SacChecklistProps) {
-  const [checkedById, setCheckedById] = useState<Record<string, boolean>>(
+  const [checkedByKey, setCheckedByKey] = useState<Record<string, boolean>>(
     () => {
       const initial: Record<string, boolean> = {};
       for (const group of groups) {
         for (const item of group.items) {
-          initial[item.sourceId] = item.checked;
+          initial[itemKey(item.sourceType, item.sourceId)] = item.checked;
         }
       }
       return initial;
     }
   );
-  const [errorId, setErrorId] = useState<string | null>(null);
-  // sourceId en cours d'enregistrement -- désactive uniquement CET item
-  // pendant l'aller-retour serveur (pas toute la liste), et empêche un
-  // double-tap rapide sur le même item de déclencher deux upserts concurrents
-  // dont l'ordre de résolution n'est pas garanti.
-  const [pendingId, setPendingId] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<string | null>(null);
+  // Clé en cours d'enregistrement -- désactive uniquement CET item pendant
+  // l'aller-retour serveur (pas toute la liste), et empêche un double-tap
+  // rapide sur le même item de déclencher deux upserts concurrents dont
+  // l'ordre de résolution n'est pas garanti.
+  const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  function handleToggle(sourceId: string) {
-    if (pendingId === sourceId) return;
+  function handleToggle(sourceId: string, sourceType: string) {
+    const key = itemKey(sourceType, sourceId);
+    if (pendingKey === key) return;
 
-    const next = !checkedById[sourceId];
-    setErrorId(null);
-    setPendingId(sourceId);
-    setCheckedById((prev) => ({ ...prev, [sourceId]: next }));
+    const next = !checkedByKey[key];
+    setErrorKey(null);
+    setPendingKey(key);
+    setCheckedByKey((prev) => ({ ...prev, [key]: next }));
 
     startTransition(async () => {
       const result = await toggleChecklistItem({
         date: dateIso,
         sourceId,
+        sourceType,
         checked: next,
       });
       if (!result.ok) {
         // Annule la mise à jour optimiste -- l'état affiché doit toujours
         // refléter ce qui est réellement enregistré.
-        setCheckedById((prev) => ({ ...prev, [sourceId]: !next }));
-        setErrorId(sourceId);
+        setCheckedByKey((prev) => ({ ...prev, [key]: !next }));
+        setErrorKey(key);
       }
-      setPendingId(null);
+      setPendingKey(null);
     });
   }
 
   const total = groups.reduce((sum, group) => sum + group.items.length, 0);
   const done = groups.reduce(
     (sum, group) =>
-      sum + group.items.filter((item) => checkedById[item.sourceId]).length,
+      sum +
+      group.items.filter(
+        (item) => checkedByKey[itemKey(item.sourceType, item.sourceId)]
+      ).length,
     0
   );
 
@@ -138,14 +160,15 @@ export function SacChecklist({
             ) : (
               <ul className="flex flex-col gap-1.5">
                 {group.items.map((item) => {
-                  const checked = checkedById[item.sourceId] ?? item.checked;
+                  const key = itemKey(item.sourceType, item.sourceId);
+                  const checked = checkedByKey[key] ?? item.checked;
                   return (
-                    <li key={item.sourceId}>
+                    <li key={key}>
                       <button
                         type="button"
-                        onClick={() => handleToggle(item.sourceId)}
+                        onClick={() => handleToggle(item.sourceId, item.sourceType)}
                         aria-pressed={checked}
-                        disabled={pendingId === item.sourceId}
+                        disabled={pendingKey === key}
                         className="flex min-h-[44px] w-full items-center gap-3 rounded-xl bg-muted px-3 py-2 text-left disabled:opacity-60"
                       >
                         <span
@@ -163,7 +186,7 @@ export function SacChecklist({
                         </span>
                         <span
                           className={cn(
-                            "text-base",
+                            "break-words text-base",
                             checked
                               ? "text-muted-foreground line-through"
                               : "text-foreground"
@@ -172,7 +195,7 @@ export function SacChecklist({
                           {item.label}
                         </span>
                       </button>
-                      {errorId === item.sourceId && (
+                      {errorKey === key && (
                         <p
                           role="alert"
                           className="pt-1 pl-9 text-sm font-medium text-destructive"

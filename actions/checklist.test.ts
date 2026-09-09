@@ -3,7 +3,11 @@ import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { prisma } from "../data/prisma";
 import { ensureSeedUser } from "../data/user";
 import { listFixedChecklistItems } from "../data/checklist";
-import { CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS } from "../domain/checklist";
+import {
+  CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
+  CHECKLIST_TYPE_MATIN,
+  DEFAULT_MATIN_ITEMS,
+} from "../domain/checklist";
 import {
   createRetourChecklistItem,
   toggleChecklistItem,
@@ -28,6 +32,7 @@ const TEST_SOURCE_IDS = [
   "action-test-bad-source",
   "action-test-matin-item",
   "action-test-retour-item",
+  "action-test-devoir-a-rendre-item",
 ];
 
 const TEST_RETOUR_CREATE_LABEL = "action-test-retour-create-label";
@@ -84,6 +89,25 @@ describe("toggleChecklistItem -- valeurs par défaut (spec 2.2, généralisation
       where: { sourceId: { in: ["action-test-bad-type", "action-test-bad-source"] } },
     });
     expect(rows).toHaveLength(0);
+  });
+
+  it("accepte sourceType=DEVOIR_A_RENDRE (Story 2.5, FR-18)", async () => {
+    const result = await toggleChecklistItem({
+      date: "2026-12-20",
+      sourceId: "action-test-devoir-a-rendre-item",
+      checked: true,
+      sourceType: CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
+    });
+
+    expect(result.ok).toBe(true);
+
+    const rows = await prisma.checklistItemState.findMany({
+      where: { sourceId: "action-test-devoir-a-rendre-item" },
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0].checklistType).toBe("SAC");
+    expect(rows[0].sourceType).toBe(CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE);
+    expect(rows[0].checked).toBe(true);
   });
 });
 
