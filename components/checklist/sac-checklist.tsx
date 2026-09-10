@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { Check } from "lucide-react";
 import { SubjectTag } from "@/components/schedule/subject-tag";
 import { toggleChecklistItem } from "@/actions/checklist";
+import { useJustToggled } from "@/lib/use-just-toggled";
 import { cn } from "@/lib/utils";
 
 // Bloc "Avant d'aller se coucher" (Accueil, Story 2.1, renommé/étendu retour
@@ -81,6 +82,10 @@ export function SacChecklist({
   // rapide sur le même item de déclencher deux upserts concurrents dont
   // l'ordre de résolution n'est pas garanti.
   const [pendingKey, setPendingKey] = useState<string | null>(null);
+  // Refonte visuelle -- clé dont la coche vient d'être animée (pop + flash
+  // de couleur bref sur la ligne), même hook que FixedChecklist/
+  // RevisionsChecklist (`lib/use-just-toggled.ts`).
+  const { justToggledKey, markJustToggled } = useJustToggled();
   const [, startTransition] = useTransition();
 
   function handleToggle(sourceId: string, sourceType: string) {
@@ -91,6 +96,8 @@ export function SacChecklist({
     setErrorKey(null);
     setPendingKey(key);
     setCheckedByKey((prev) => ({ ...prev, [key]: next }));
+
+    if (next) markJustToggled(key);
 
     startTransition(async () => {
       const result = await toggleChecklistItem({
@@ -156,6 +163,7 @@ export function SacChecklist({
                 {group.items.map((item) => {
                   const key = itemKey(item.sourceType, item.sourceId);
                   const checked = checkedByKey[key] ?? item.checked;
+                  const justToggled = justToggledKey === key;
                   return (
                     <li key={key}>
                       <button
@@ -163,7 +171,10 @@ export function SacChecklist({
                         onClick={() => handleToggle(item.sourceId, item.sourceType)}
                         aria-pressed={checked}
                         disabled={pendingKey === key}
-                        className="flex min-h-[44px] w-full items-center gap-3 rounded-xl bg-muted px-3 py-2 text-left disabled:opacity-60"
+                        className={cn(
+                          "flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors duration-500 disabled:opacity-60",
+                          justToggled ? "bg-success/15" : "bg-muted"
+                        )}
                       >
                         <span
                           aria-hidden="true"
@@ -171,7 +182,8 @@ export function SacChecklist({
                             "flex size-6 shrink-0 items-center justify-center rounded-full ring-2 transition-colors",
                             checked
                               ? "bg-success ring-success"
-                              : "bg-transparent ring-neutral-pending"
+                              : "bg-transparent ring-neutral-pending",
+                            justToggled && "animate-in zoom-in-50 duration-300"
                           )}
                         >
                           {checked && (

@@ -3,6 +3,9 @@
 import { useState, useTransition } from "react";
 import { Check } from "lucide-react";
 import type { ActionResult, ToggleChecklistItemInput } from "@/actions/checklist";
+import { CelebrationBadge } from "@/components/moment/celebration-badge";
+import { useJustCompleted } from "@/lib/use-just-completed";
+import { useJustToggled } from "@/lib/use-just-toggled";
 import { cn } from "@/lib/utils";
 
 // Bloc liste plate fixe (Accueil) -- posé pour "Ce matin" en Story 2.2,
@@ -71,6 +74,10 @@ export function FixedChecklist({
   // sourceId en cours d'enregistrement -- désactive uniquement CET item
   // pendant l'aller-retour serveur, empêche un double-tap concurrent.
   const [pendingId, setPendingId] = useState<string | null>(null);
+  // Refonte visuelle -- clé dont la coche vient d'être animée (pop + flash
+  // de couleur bref sur la ligne), partagé avec SacChecklist/
+  // RevisionsChecklist (`lib/use-just-toggled.ts`).
+  const { justToggledKey, markJustToggled } = useJustToggled();
   const [, startTransition] = useTransition();
 
   function handleToggle(sourceId: string) {
@@ -80,6 +87,8 @@ export function FixedChecklist({
     setErrorId(null);
     setPendingId(sourceId);
     setCheckedById((prev) => ({ ...prev, [sourceId]: next }));
+
+    if (next) markJustToggled(sourceId);
 
     startTransition(async () => {
       const result = await onToggle({
@@ -99,13 +108,22 @@ export function FixedChecklist({
 
   const total = items.length;
   const done = items.filter((item) => checkedById[item.sourceId]).length;
+  // Refonte visuelle -- célébration de moment (Matin/Retour n'ont pas de
+  // "moment card" englobante comme MomentSoirCard pour Ce soir : ce
+  // composant EST le contenu entier de leur panneau, donc porte lui-même le
+  // badge). Un bloc vide (`total === 0`) n'est jamais "complet" ici
+  // (contrairement à `isBlockComplete` du domaine) -- pas de célébration
+  // pour une liste sans aucun item, cas volontairement distinct de la
+  // complétude utilisée pour le repli visuel/la jauge (Story 3.2, étape 2).
+  const complete = total > 0 && done === total;
+  const justCompleted = useJustCompleted(complete);
 
   const Wrapper = hideTitle ? "div" : "section";
 
   return (
     <Wrapper
       aria-labelledby={headingId}
-      className="flex flex-col gap-4 rounded-2xl bg-card p-4 ring-1 ring-border"
+      className="flex flex-col gap-4 rounded-2xl bg-card p-4 shadow-brand ring-1 ring-border"
     >
       <div
         className={cn(
@@ -138,6 +156,12 @@ export function FixedChecklist({
         )}
       </div>
 
+      <CelebrationBadge
+        complete={complete}
+        justCompleted={justCompleted}
+        label="Tout est prêt !"
+      />
+
       {total === 0 && (
         <p className="text-sm text-muted-foreground">
           Aucun item dans cette liste -- ajoutes-en depuis Réglages.
@@ -147,6 +171,7 @@ export function FixedChecklist({
       <ul className="flex flex-col gap-1.5">
         {items.map((item) => {
           const checked = checkedById[item.sourceId] ?? item.checked;
+          const justToggled = justToggledKey === item.sourceId;
           return (
             <li key={item.sourceId}>
               <button
@@ -154,7 +179,10 @@ export function FixedChecklist({
                 onClick={() => handleToggle(item.sourceId)}
                 aria-pressed={checked}
                 disabled={pendingId === item.sourceId}
-                className="flex min-h-[44px] w-full items-center gap-3 rounded-xl bg-muted px-3 py-2 text-left disabled:opacity-60"
+                className={cn(
+                  "flex min-h-[44px] w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition-colors duration-500 disabled:opacity-60",
+                  justToggled ? "bg-success/15" : "bg-muted"
+                )}
               >
                 <span
                   aria-hidden="true"
@@ -162,7 +190,8 @@ export function FixedChecklist({
                     "flex size-6 shrink-0 items-center justify-center rounded-full ring-2 transition-colors",
                     checked
                       ? "bg-success ring-success"
-                      : "bg-transparent ring-neutral-pending"
+                      : "bg-transparent ring-neutral-pending",
+                    justToggled && "animate-in zoom-in-50 duration-300"
                   )}
                 >
                   {checked && <Check className="size-4 text-success-foreground" />}
