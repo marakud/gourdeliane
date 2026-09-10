@@ -38,6 +38,8 @@ Exigence de sécurité déjà actée : les identifiants Pronote de l'enfant devr
 
 Cette intégration est volontairement repoussée après la v1 : elle introduit un risque technique et une dépendance externe non maîtrisée, alors que la valeur du produit (routines, autonomie) ne dépend pas d'elle pour démarrer.
 
+**Mise à jour (2026-09-09, recherche technique + décision) :** revérifiée comme prévu ci-dessus, avant plutôt qu'au moment de l'implémentation. Rapport complet : `_bmad-output/planning-artifacts/research/technical-integration-pronote-pawnote-2026-09-09/research.md`. Constat : `pawnote` (la piste privilégiée ci-dessus) est en réalité obsolète -- aucune release npm depuis ~11,5 mois, dépôts GitHub introuvables, auteur migré vers un hébergement auto-géré sans successeur TypeScript maintenu identifié. `pronotepy` reste vivant mais en "mode maintenance" et sans pont natif vers Node (second runtime requis). **Décision de l'utilisateur : abandonné, pas juste reporté.** Motif au-delà du seul risque technique/légal (réel, cf. rapport) : faire noter les devoirs par l'enfant lui-même sert directement l'objectif d'autonomie de ce produit -- l'automatiser via Pronote irait à l'encontre de cette valeur, pas seulement en coûter la maintenance. À ne pas reprendre sans qu'un besoin concret et nouveau ne le justifie.
+
 ## Historique de décision
 
 Le détail des échanges, décisions et hypothèses qui ont mené à ce brief est journalisé dans `.memlog.md` (même dossier).

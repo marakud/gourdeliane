@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recherche technique — Intégration Pronote</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f7f7f8;
+    --card: #ffffff;
+    --text: #1a1a1a;
+    --muted: #5a5a63;
+    --border: #e2e2e6;
+    --accent: #5b5bd6;
+    --accent-soft: #eeeeff;
+    --high: #1a7f4b;
+    --high-bg: #e6f6ed;
+    --medium: #a06a00;
+    --medium-bg: #fdf3e0;
+    --low: #b23b3b;
+    --low-bg: #fbeaea;
+    --disputed: #ffffff;
+    --disputed-bg: #b23b3b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181c;
+      --card: #1f2025;
+      --text: #eaeaec;
+      --muted: #a3a3ad;
+      --border: #33343a;
+      --accent: #9a9aff;
+      --accent-soft: #26263a;
+      --high: #5fd68f;
+      --high-bg: #16311f;
+      --medium: #e0b34a;
+      --medium-bg: #3a2c0c;
+      --low: #ef8585;
+      --low-bg: #3a1a1a;
+      --disputed: #1a1a1a;
+      --disputed-bg: #ef8585;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 24px 20px 80px; }
+  header.top {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  header.top h1 { margin: 0 0 8px; font-size: 1.5rem; }
+  .meta { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 0.85rem; color: var(--muted); }
+  .meta span strong { color: var(--text); }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 22px 24px;
+    margin-bottom: 18px;
+  }
+  .card.exec { border-left: 4px solid var(--accent); }
+  h2 { font-size: 1.15rem; margin-top: 0; }
+  h3 { font-size: 1rem; }
+  .toc {
+    position: sticky;
+    top: 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    font-size: 0.85rem;
+    z-index: 10;
+  }
+  .toc a { color: var(--accent); text-decoration: none; margin-right: 14px; }
+  .toc a:hover { text-decoration: underline; }
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+    margin-left: 6px;
+    white-space: nowrap;
+  }
+  .badge.high { color: var(--high); background: var(--high-bg); }
+  .badge.medium { color: var(--medium); background: var(--medium-bg); }
+  .badge.low { color: var(--low); background: var(--low-bg); }
+  .badge.disputed { color: var(--disputed); background: var(--disputed-bg); font-weight: 700; }
+  .badge.unverified { color: var(--disputed); background: var(--disputed-bg); font-weight: 700; }
+  a.src { color: var(--accent); text-decoration: none; font-weight: 600; }
+  a.src:hover { text-decoration: underline; }
+  ul, ol { padding-left: 22px; }
+  li { margin-bottom: 8px; }
+  table.sources {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+  table.sources td {
+    border-bottom: 1px solid var(--border);
+    padding: 8px 6px;
+    vertical-align: top;
+  }
+  table.sources td:first-child { white-space: nowrap; font-weight: 600; }
+  table.sources a { color: var(--accent); }
+  details {
+    background: var(--accent-soft);
+    border-radius: 12px;
+    padding: 10px 16px;
+  }
+  details summary { cursor: pointer; font-weight: 600; }
+  table.staleness { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+  table.staleness td, table.staleness th { border-bottom: 1px solid var(--border); padding: 8px 6px; text-align: left; }
+  .quote { border-left: 3px solid var(--accent); padding-left: 12px; color: var(--muted); font-style: italic; }
+  .verdict-box {
+    background: var(--accent-soft);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin: 12px 0;
+  }
+  code { background: var(--accent-soft); padding: 1px 5px; border-radius: 4px; font-size: 0.9em; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <h1>Recherche technique — Intégration Pronote (pawnote vs alternatives)</h1>
+  <div class="meta">
+    <span><strong>Décision :</strong> choisir/rejeter une librairie Pronote non-officielle pour CartableFlow</span>
+    <span><strong>Type :</strong> technical · select</span>
+    <span><strong>Créé :</strong> 2026-09-09</span>
+    <span><strong>Effort :</strong> standard · validation normal</span>
+    <span><strong>Claims :</strong> 8 vérifiées · 2 disputées · 1 non vérifiée</span>
+  </div>
+</header>
+
+<nav class="toc">
+  <a href="#exec">Résumé</a>
+  <a href="#dim1">Écosystème</a>
+  <a href="#dim2">Fonctionnalités</a>
+  <a href="#dim3">Risque légal</a>
+  <a href="#cross">Insights croisés</a>
+  <a href="#contrary">Contre-arguments</a>
+  <a href="#reco">Recommandations</a>
+  <a href="#open">Questions ouvertes</a>
+  <a href="#sources">Sources</a>
+  <a href="#stale">Fraîcheur</a>
+</nav>
+
+<section class="card exec" id="exec">
+  <h2>Résumé exécutif</h2>
+  <p><strong>Aucune des deux librairies "actives" candidates n'est dans l'état où le brief d'origine les avait laissées.</strong> <code>pawnote</code> (TypeScript, la piste privilégiée du brief) n'a publié aucune version npm depuis 11,5 mois <span class="badge high">high</span> ; son auteur a quitté GitHub pour un hébergement auto-géré, et le projet qui en reprend le nom est désormais écrit en <strong>Rust</strong>, sans successeur TS maintenu identifié <span class="badge disputed">disputed</span>. <code>pronotepy</code> (Python) est réellement vivant (dernier commit il y a 6 jours <span class="badge high">high</span>) mais volontairement en <strong>"mode maintenance"</strong> et sans pont natif vers Node.js.</p>
+  <p><strong>Le risque légal n'est pas théorique</strong> : un précédent confirmé (fermeture de "pronote-api" en 2021, motif pénal français) <span class="badge high">high</span> existe ; Index Éducation a depuis assoupli son discours public ("pas illégal en soi" sous conditions) mais reste dissuasif.</p>
+  <div class="verdict-box">
+    <strong>Recommandation :</strong> <code>pronotepy</code> via un micro-service Python léger, plutôt que <code>pawnote</code> figée — seule <code>pronotepy</code> reçoit encore des correctifs quand Pronote change quelque chose. <span class="badge medium">confiance moyenne</span>
+  </div>
+  <p><strong>Plus grosse réserve :</strong> support ENT réel de pawnote non résolu <span class="badge disputed">disputed</span>, et nature exacte du projet Rust <code>index-education/pronote</code> non confirmée <span class="badge low">low</span>.</p>
+</section>
+
+<section class="card" id="dim1">
+  <h2>1. Santé de l'écosystème &amp; paysage des candidats</h2>
+  <p>Motif récurrent : chaque génération de librairie finit par recommander la suivante plutôt que de continuer à évoluer.</p>
+  <ul>
+    <li><strong>pronotepy</strong> (Python) — dernier commit 2026-09-03, v2.15.7 le même jour, 235★, 30 contributeurs <span class="badge high">high</span> — mais "mode maintenance" revendiqué : <span class="quote">"We will continue to fix bugs and adapt to PRONOTE changes, but will not be adding new features."</span> <a class="src" href="#src-3">[3]</a></li>
+    <li><strong>pawnote</strong> (TypeScript) — deux dépôts GitHub (Vexcited/Pawnote, LiterateInk/Pawnote.js) en 404 ; npm gelé depuis 2025-09-21 (v1.6.2) <span class="badge high">high</span> <a class="src" href="#src-2">[2]</a>. Cause : l'auteur a migré vers un hébergement auto-géré (<span class="quote">"GitHub is not a safe place anymore"</span>) <a class="src" href="#src-5">[5]</a>, pas un abandon pur.</li>
+    <li>Le projet reprenant le nom sur l'instance de l'auteur (<code>index-education/pronote</code>) est listé comme <strong>Rust</strong>, mis à jour 2026-06-21, sans successeur TypeScript maintenu identifié <span class="badge medium">medium</span> <a class="src" href="#src-6">[6]</a> — <em>identité exacte avec l'ancien Pawnote non confirmée</em>.</li>
+    <li><strong>Blocksnote</strong> (TS, MIT) — alternative indépendante confirmée, mais petite (13★) <span class="badge medium">medium</span> <a class="src" href="#src-7">[7]</a>.</li>
+    <li><strong>pronote-mcp</strong> (candidat signalé par l'utilisateur) — écarté : serveur MCP pour Claude Desktop, pas une librairie backend ; verrouillé sur l'ENT "Monlycée" (lycées d'Île-de-France uniquement) ; 1 release depuis avril 2026 ; identifiants en clair <span class="badge high">high</span> <a class="src" href="#src-21">[21]</a>.</li>
+    <li>Précédent historique : <strong>pronote-api</strong> (Litarvan), l'ancêtre commun, arrêté le 2021-04-30 à la demande d'Index Éducation <span class="badge high">high</span> <a class="src" href="#src-8">[8]</a>.</li>
+  </ul>
+</section>
+
+<section class="card" id="dim2">
+  <h2>2. Fonctionnalités exposées &amp; réalité d'intégration</h2>
+  <p>Même périmètre de données pour les deux librairies actives : devoirs, notes/moyennes, EDT, absences, discussions, infos établissement <a class="src" href="#src-10">[10]</a>.</p>
+  <ul>
+    <li><strong>pawnote</strong> — paquet npm pur, consommé directement depuis Node.js en production (connecteur Cozy) <span class="badge medium">medium</span> <a class="src" href="#src-11">[11]</a>. Aucune preuve qu'il nécessite Puppeteer/Playwright <a class="src" href="#src-9">[9]</a>.</li>
+    <li><strong>pronotepy</strong> — Python pur, sans pont Node natif ; son propre README renvoie vers pawnote/Blocksnote pour du JS/TS <span class="badge medium">medium</span> <a class="src" href="#src-12">[12]</a>. Un wrapper REST tiers existe, maintenance non vérifiée <span class="badge low">low</span> <a class="src" href="#src-13">[13]</a>.</li>
+    <li><strong>Support ENT</strong> (Toutatice, Éduconnect, CAS) — sources contradictoires sur pawnote (une doc dit "jamais supporté", une autre dit "supporté") <span class="badge disputed">disputed</span> <a class="src" href="#src-14">[14]</a>. Preuve empirique en faveur du support réel : le connecteur Cozy l'implémente en production <a class="src" href="#src-11">[11]</a>.</li>
+    <li>Documentation officielle de pawnote (docs.literate.ink) expirée, page de revente de domaine <span class="badge high">high</span> <a class="src" href="#src-16">[16]</a>.</li>
+  </ul>
+</section>
+
+<section class="card" id="dim3">
+  <h2>3. Risque légal/CGU &amp; réalité d'implémentation</h2>
+  <p>Précédent confirmé (2021) : <span class="quote">"la mise à disposition d'un programme informatique conçu pour permettre un accès frauduleux à un système de traitement automatisé de données (STAD)"</span> <span class="badge high">high</span> <a class="src" href="#src-8">[8]</a>. Position actuelle plus nuancée d'Index Éducation : <span class="quote">"Cette pratique n'est pas illégale en soi"</span> si identifiants fournis volontairement et sans usage commercial <span class="badge high">high</span> <a class="src" href="#src-17">[17]</a> — mais met en garde contre la récupération de données par des tiers.</p>
+  <p>Casse périodique documentée, pas hypothétique : issue pronotepy #334 (ENT ac_orleans_tours cassé, fermée "not planned") et hass-pronote #94 (erreur de déchiffrement AES depuis déc. 2024, sans réponse) <span class="badge high">high</span> <a class="src" href="#src-19">[19]</a>. Une app aval ("yNotes") est désormais archivée "NOT MAINTAINED" <span class="badge medium">medium</span> <a class="src" href="#src-20">[20]</a>.</p>
+</section>
+
+<section class="card" id="cross">
+  <h2>Insights croisés</h2>
+  <ul>
+    <li>La librairie la mieux intégrée au stack (pawnote) est la moins vivante ; la plus vivante (pronotepy) est la moins bien intégrée — aucun candidat ne gagne sur les deux axes.</li>
+    <li>Le risque légal ne différencie pas les candidats entre eux — il pèse également sur tous.</li>
+    <li>Motif "succession sans continuité" observé sur 3 générations de librairies — un remplacement futur est probable, pas exceptionnel.</li>
+  </ul>
+</section>
+
+<section class="card" id="contrary">
+  <h2>Contre-arguments</h2>
+  <p><em>Pas de passe red-team exécutée (désactivée par défaut). Points trouvés en cours de route qui jouent contre la recommandation :</em></p>
+  <ul>
+    <li><strong>Contre pronotepy :</strong> second runtime Python dans un projet 100% Next.js/Node — coût réel, même si Vercel propose des fonctions serverless Python (non vérifié cette session).</li>
+    <li><strong>Contre "pawnote abandonné" :</strong> l'auteur est actif ailleurs (Rust, mis à jour en juin 2026) — migrer d'écosystème n'est pas disparaître. La version npm 1.6.2 peut rester utilisable longtemps.</li>
+    <li><strong>Contre le risque légal comme facteur bloquant :</strong> aucune action spécifique contre pronotepy/pawnote trouvée — les deux sont distribués publiquement 4+ ans après le précédent de 2021.</li>
+  </ul>
+</section>
+
+<section class="card" id="reco">
+  <h2>Recommandations</h2>
+  <ol>
+    <li><strong>Ne pas implémenter Pronote maintenant sur la base du choix pawnote du brief d'origine — il est obsolète.</strong> <span class="badge high">confiance haute</span></li>
+    <li><strong>Retenir pronotepy comme candidat principal</strong>, exposé via une fonction serverless Python légère (faisabilité Vercel/palier gratuit à confirmer séparément). <span class="badge medium">confiance moyenne</span></li>
+    <li><strong>Isoler l'intégration derrière une interface interne stable</strong> — remplacement futur probable vu l'historique de succession. <span class="badge high">confiance haute</span></li>
+    <li><strong>Traiter le risque légal comme principe de conception</strong> : identifiants saisis par l'utilisateur final, chiffrement au repos, pas de republication, pas d'usage commercial. <span class="badge medium">confiance moyenne</span></li>
+    <li><strong>Revérifier ce choix juste avant l'implémentation réelle</strong>, pas seulement avant la planification. <span class="badge high">confiance haute</span></li>
+  </ol>
+</section>
+
+<section class="card" id="open">
+  <h2>Questions ouvertes</h2>
+  <ul>
+    <li>Le dépôt Rust <code>index-education/pronote</code> est-il la continuation directe de Pawnote, ou un projet distinct réutilisant le même slogan ?</li>
+    <li>pawnote supporte-t-il réellement l'authentification ENT nativement, ou seulement via une primitive bas niveau ?</li>
+    <li>Vercel supporte-t-il des fonctions serverless Python dans le palier gratuit avec un cold-start acceptable ?</li>
+    <li><strong>Quel ENT (s'il y en a un) utilise l'établissement réel visé par CartableFlow ?</strong> — posé à l'utilisateur, réponse en attente.</li>
+    <li>La clause CGU corporate d'Index Éducation figure-t-elle réellement dans les CGU produit Pronote présentées à l'élève/parent ?</li>
+  </ul>
+</section>
+
+<section class="card" id="sources">
+  <h2>Sources</h2>
+  <details open>
+    <summary>21 sources (cliquer pour replier)</summary>
+    <br>
+    <table class="sources">
+      <tbody><tr id="src-1"><td>[1]</td><td>pronotepy activité récente (commit/release 2026-09-03, 235★, 30 contributeurs)</td><td><a href="https://github.com/bain3/pronotepy" target="_blank" rel="noopener">GitHub — bain3/pronotepy</a></td><td>2026-09-03</td><td>2026-09-09</td><td>high</td></tr><tr id="src-2"><td>[2]</td><td>Paquet npm `pawnote` : dernière version 1.6.2 le 2025-09-21, aucune depuis</td><td><a href="https://registry.npmjs.org/pawnote" target="_blank" rel="noopener">npm registry</a></td><td>2025-09-21</td><td>2026-09-09</td><td>high</td></tr><tr id="src-3"><td>[3]</td><td>pronotepy README : "mode maintenance", pas de nouvelles fonctionnalités</td><td><a href="https://raw.githubusercontent.com/bain3/pronotepy/master/README.md" target="_blank" rel="noopener">GitHub — bain3/pronotepy README</a></td><td>2026</td><td>2026-09-09</td><td>high</td></tr><tr id="src-4"><td>[4]</td><td>Lien de succession vers "PRONOTE (ex. Pawnote)" via Radicle</td><td><a href="https://raw.githubusercontent.com/bain3/pronotepy/master/README.md" target="_blank" rel="noopener">GitHub — bain3/pronotepy README</a></td><td>2026</td><td>2026-09-09</td><td>high</td></tr><tr id="src-5"><td>[5]</td><td>Profil auteur "Vexcited" : projets déplacés vers Forgejo auto-hébergé</td><td><a href="https://github.com/vexcited" target="_blank" rel="noopener">GitHub — profil Vexcited</a></td><td>2026</td><td>2026-09-09</td><td>high</td></tr><tr id="src-6"><td>[6]</td><td>Dépôt `index-education/pronote` (Rust) et `pronote.build` (TS, outil de datamine)</td><td><a href="https://code.vexcited.com" target="_blank" rel="noopener">code.vexcited.com</a></td><td>2026-06-21</td><td>2026-09-09</td><td>medium</td></tr><tr id="src-7"><td>[7]</td><td>Blocksnote confirmé projet indépendant (13★, 3 issues, 4 forks)</td><td><a href="https://github.com/BlocksHub/Blocksnote" target="_blank" rel="noopener">GitHub — BlocksHub/Blocksnote</a></td><td>2026</td><td>2026-09-09</td><td>medium</td></tr><tr id="src-8"><td>[8]</td><td>Fermeture de pronote-api (2021-04-30) à la demande d'Index Éducation, motif STAD</td><td><a href="https://raw.githubusercontent.com/Litarvan/pronote-api/master/README.md" target="_blank" rel="noopener">GitHub — Litarvan/pronote-api README</a></td><td>2021-04-30</td><td>2026-09-09</td><td>high</td></tr><tr id="src-9"><td>[9]</td><td>Aucune preuve que pawnote nécessite Puppeteer/Playwright ; paquet npm pur</td><td><a href="https://unpkg.com/pawnote/README.md" target="_blank" rel="noopener">npm/unpkg README mirror</a></td><td>2026</td><td>2026-09-09</td><td>medium</td></tr><tr id="src-10"><td>[10]</td><td>Fonctionnalités exposées (devoirs, notes, EDT, absences, discussions, infos)</td><td>pawnote TypeDoc + pronotepy README/readthedocs</td><td>2026</td><td>2026-09-09</td><td>medium</td></tr><tr id="src-11"><td>[11]</td><td>Connecteur Cozy "konnectors/pronote" utilise pawnote en Node.js avec login CAS/ENT/Toutatice</td><td><a href="https://github.com/konnectors/pronote" target="_blank" rel="noopener">GitHub — konnectors/pronote</a></td><td>2026</td><td>2026-09-09</td><td>medium</td></tr><tr id="src-12"><td>[12]</td><td>pronotepy Python-only, pas de pont Node natif, renvoie vers pawnote/Blocksnote</td><td><a href="https://raw.githubusercontent.com/bain3/pronotepy/master/README.md" target="_blank" rel="noopener">GitHub — bain3/pronotepy README</a></td><td>2026</td><td>2026-09-09</td><td>medium</td></tr><tr id="src-13"><td>[13]</td><td>Wrapper REST tiers `papillon-python` (hug + Docker) sur pronotepy, maintenance non vérifiée</td><td><a href="https://github.com/Christian-Martins/papillon-python" target="_blank" rel="noopener">GitHub — Christian-Martins/papillon-python</a></td><td>2026</td><td>2026-09-09</td><td>low</td></tr><tr id="src-14"><td>[14]</td><td>Contradiction sur le support ENT natif de pawnote (deux versions de doc opposées)</td><td>pawnote.js.org / npm README (versions 0.7.0 et ~0.20.x, via recherche web)</td><td>2025–2026</td><td>2026-09-09</td><td>low</td></tr><tr id="src-15"><td>[15]</td><td>Support ENT de pronotepy réel mais maintenu par la communauté, pas garanti</td><td><a href="https://raw.githubusercontent.com/bain3/pronotepy/master/README.md" target="_blank" rel="noopener">GitHub — bain3/pronotepy README</a></td><td>2026</td><td>2026-09-09</td><td>medium</td></tr><tr id="src-16"><td>[16]</td><td>Domaine de documentation pawnote (docs.literate.ink) expiré, page de revente</td><td>docs.literate.ink (fetch direct)</td><td>2026-09-09</td><td>2026-09-09</td><td>high</td></tr><tr id="src-17"><td>[17]</td><td>Position officielle d'Index Éducation sur les apps tierces ("Papillon") : "pas illégale en soi"</td><td><a href="https://www.index-education.com/fr/article-1760-recommandations-relatives-a-l-application-papillon.php" target="_blank" rel="noopener">Index Éducation</a></td><td>date incertaine</td><td>2026-09-09</td><td>high</td></tr><tr id="src-18"><td>[18]</td><td>CGU corporate Index Éducation : interdiction d'accès automatisé sans autorisation écrite</td><td><a href="https://www.index-education.com/fr/article-206-mentions-leacute-gales-et-condition-geacute-neacute-rales-d-utilisation.php" target="_blank" rel="noopener">Index Éducation — mentions légales</a></td><td>date incertaine</td><td>2026-09-09</td><td>medium</td></tr><tr id="src-19"><td>[19]</td><td>Incidents de casse documentés (issue pronotepy #334 ; hass-pronote #94)</td><td><a href="https://github.com/bain3/pronotepy/issues/334" target="_blank" rel="noopener">GitHub — bain3/pronotepy/issues/334</a>, <a href="https://github.com/delphiki/hass-pronote/issues/94" target="_blank" rel="noopener">GitHub — delphiki/hass-pronote/issues/94</a></td><td>2025-09 / 2024-12</td><td>2026-09-09</td><td>high</td></tr><tr id="src-20"><td>[20]</td><td>Application aval "yNotes" désormais archivée "NOT MAINTAINED"</td><td><a href="https://github.com/EduWireApps/ynotes" target="_blank" rel="noopener">GitHub — EduWireApps/ynotes</a> (via résumé de recherche)</td><td>2026</td><td>2026-09-09</td><td>medium</td></tr><tr id="src-21"><td>[21]</td><td>pronote-mcp : serveur MCP pour Claude Desktop, verrouillé sur l'ENT Monlycée (Île-de-France, lycées uniquement), 1 release depuis avril 2026, identifiants en clair</td><td><a href="https://pypi.org/project/pronote-mcp/" target="_blank" rel="noopener">PyPI — pronote-mcp</a>, <a href="https://github.com/thomasgreissler/pronote-mcp" target="_blank" rel="noopener">GitHub — thomasgreissler/pronote-mcp</a></td><td>2026-04-18</td><td>2026-09-09</td><td>high</td></tr></tbody>
+    </table>
+  </details>
+</section>
+
+<section class="card" id="stale">
+  <h2>Carte de fraîcheur</h2>
+  <table class="staleness">
+    <thead><tr><th>Classe</th><th>Fenêtre</th><th>Ré-examiner avant</th></tr></thead>
+    <tbody>
+      <tr><td>version/compat (versions npm/PyPI, langage du dépôt Rust)</td><td>≤ 1 mois</td><td><strong>Immédiat</strong> — déjà à la limite</td></tr>
+      <tr><td>ecosystem-signal (activité GitHub, statut mainteneur)</td><td>≤ 6 mois</td><td>2027-03</td></tr>
+      <tr><td>landscape (paysage des candidats)</td><td>≤ 12 mois</td><td>2027-09</td></tr>
+      <tr><td>pattern (motifs de casse, réconciliations)</td><td>≤ 24 mois</td><td>2028-09</td></tr>
+    </tbody>
+  </table>
+  <p style="color:var(--muted); font-size:0.85rem; margin-top:12px;">À revérifier explicitement au moment de commencer l'implémentation, pas seulement au moment de la planification.</p>
+</section>
+
+</div>
+</body>
+</html>
