@@ -90,3 +90,50 @@ export function selectCurrentMomentCompletion(
   if (currentMoment === "RETOUR") return retourComplete;
   return soirComplete;
 }
+
+/** Nombre d'objets faits/total dans un bloc -- refonte visuelle, carte
+ * d'accueil (missions restantes + jauge). Un bloc vide donne `{done: 0,
+ * total: 0}` (jamais `NaN`) ; l'appelant décide comment l'afficher (ex.
+ * "rien de prévu" plutôt que "0/0"). */
+export interface MomentProgress {
+  done: number;
+  total: number;
+}
+
+export function countBlockProgress(
+  items: readonly ChecklistItemLike[]
+): MomentProgress {
+  return {
+    done: items.filter((item) => item.checked).length,
+    total: items.length,
+  };
+}
+
+/** Même agrégation que `computeSoirCompletion` (Sac + Révisions + devoirs à
+ * rendre demain), mais en décompte fait/total plutôt qu'en booléen -- une
+ * seule définition de "ce qui compte pour Ce soir", jamais un second
+ * calcul divergent (AD-5). */
+export function countSoirProgress(input: SoirCompletionInput): MomentProgress {
+  const sacItems = input.sacGroups.flatMap((group) => group.items);
+  const allItems = [
+    ...sacItems,
+    ...input.revisionsItems,
+    ...input.devoirsARendreDemain.map((devoir) => ({ checked: devoir.done })),
+  ];
+  return countBlockProgress(allItems);
+}
+
+/** Sélectionne, parmi les trois progressions déjà calculées séparément,
+ * celle du moment courant -- même fonction pure/testée que
+ * `selectCurrentMomentCompletion`, pour la carte d'accueil (refonte
+ * visuelle). */
+export function selectCurrentMomentProgress(
+  currentMoment: DayMoment,
+  matinProgress: MomentProgress,
+  retourProgress: MomentProgress,
+  soirProgress: MomentProgress
+): MomentProgress {
+  if (currentMoment === "MATIN") return matinProgress;
+  if (currentMoment === "RETOUR") return retourProgress;
+  return soirProgress;
+}

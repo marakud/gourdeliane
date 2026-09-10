@@ -19,7 +19,6 @@ import {
   getCurrentMoment,
   getTodaySchoolDate,
   getTomorrowSchoolDate,
-  MOMENT_LABELS,
   schoolDateToIso,
   schoolDateToWeekday,
   SCHOOL_TIME_ZONE,
@@ -40,8 +39,9 @@ import {
 import { computeDaysRemaining } from "@/domain/homework";
 import {
   computeSoirCompletion,
-  isBlockComplete,
-  selectCurrentMomentCompletion,
+  countBlockProgress,
+  countSoirProgress,
+  selectCurrentMomentProgress,
 } from "@/domain/day-completion";
 import {
   toggleMatinChecklistItem,
@@ -54,6 +54,7 @@ import { FixedChecklist } from "@/components/checklist/fixed-checklist";
 import { RevisionsChecklist } from "@/components/checklist/revisions-checklist";
 import { DevoirsList } from "@/components/homework/devoirs-list";
 import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
+import { GreetingCard } from "@/components/moment/greeting-card";
 import { MomentSoirCard } from "@/components/moment/moment-soir-card";
 import { MomentTabs } from "@/components/moment/moment-tabs";
 
@@ -288,12 +289,11 @@ export default async function AccueilPage() {
     }))
   );
 
-  // Complétude "Ce matin"/"Retour" (Story 3.2) : même fonction pure
-  // (`isBlockComplete`) et même convention "bloc vide = trivialement
-  // complet" que Sac/Révisions ci-dessus (I/O matrix spec 3.2) -- alimente le
-  // repli visuel plus bas, jamais un second calcul divergent.
-  const matinComplete = isBlockComplete(matinChecklist);
-  const retourComplete = isBlockComplete(retourChecklist);
+  // Progression Matin/Retour (refonte visuelle, carte d'accueil) -- réutilise
+  // les mêmes checklists que celles affichées dans les onglets, jamais un
+  // second calcul divergent.
+  const matinProgress = countBlockProgress(matinChecklist);
+  const retourProgress = countBlockProgress(retourChecklist);
 
   const revisionsChecklist = deriveRevisionsChecklist(
     todaySubjects.map((subject) => ({
@@ -390,6 +390,13 @@ export default async function AccueilPage() {
     revisionsItems: revisionsChecklist,
     devoirsARendreDemain,
   });
+  // Même agrégation que `soirComplete` juste au-dessus, en décompte
+  // fait/total plutôt qu'en booléen (refonte visuelle, carte d'accueil).
+  const soirProgress = countSoirProgress({
+    sacGroups,
+    revisionsItems: revisionsChecklist,
+    devoirsARendreDemain,
+  });
 
   const { dateLabel, timeLabel } = formatGreetingDateTime(now);
 
@@ -400,50 +407,29 @@ export default async function AccueilPage() {
   // (bascule 100% client, aucun rechargement).
   const currentMoment = getCurrentMoment(now);
 
-  // Repli visuel (Story 3.2, FR-11) : recalculé 100% en direct à partir de
-  // l'état réel du moment courant déjà chargé ci-dessus (jamais une lecture
-  // de `DayCompletion` ni un état côté client Notification/Service Worker,
-  // Boundaries spec 3.2) -- porte uniquement sur le moment courant, jamais
-  // les trois à la fois. Sélection extraite en fonction pure testée
-  // (correctif de revue) plutôt qu'un ternaire inline, pour qu'un
-  // branchement permuté (ex. Matin<->Retour) soit détecté par un test.
-  const currentMomentComplete = selectCurrentMomentCompletion(
+  // Repli visuel (Story 3.2, FR-11) porté désormais par la carte d'accueil
+  // elle-même ("missions restantes" + jauge, toujours visible, recalculée en
+  // direct à chaque rendu -- jamais depuis un accusé de réception push) --
+  // l'ancienne bannière séparée faisait doublon et a été retirée (refonte
+  // visuelle, étape 2). Sélection extraite en fonction pure testée
+  // (`selectCurrentMomentProgress`, domain/day-completion.ts) plutôt qu'un
+  // ternaire inline, même principe que le correctif de revue Story 3.2.
+  const currentMomentProgress = selectCurrentMomentProgress(
     currentMoment,
-    matinComplete,
-    retourComplete,
-    soirComplete
+    matinProgress,
+    retourProgress,
+    soirProgress
   );
 
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-8">
-      <div>
-        <h1 className="font-heading text-3xl font-bold text-foreground">
-          {user.firstName ? `Bonjour ${user.firstName} !` : "Bonjour !"}
-        </h1>
-        <p className="text-base text-muted-foreground">
-          Nous sommes le {dateLabel}, il est {timeLabel}.
-        </p>
-      </div>
-
-      {!currentMomentComplete && (
-        // Repli visuel (Story 3.2, FR-11, AD-8) : pas un composant
-        // `Alert`/`Banner` générique (Boundaries spec 3.2) -- bloc inline
-        // propre à cet écran, même pattern que les autres blocs rounded-2xl
-        // de cette page (ex. `MomentSoirCard`). Ton neutre/incitatif : teinte
-        // douce `accent` (jamais `destructive`/rouge), aucun mot comme
-        // "oublié". Ne porte que sur `currentMoment` (jamais les trois à la
-        // fois) et disparaît d'elle-même au prochain rendu dès que ce moment
-        // redevient complet -- pas de dismiss manuel à mémoriser.
-        <div
-          role="status"
-          className="rounded-2xl bg-accent/10 p-4 ring-1 ring-border"
-        >
-          <p className="text-base font-medium text-foreground">
-            {MOMENT_LABELS[currentMoment]} : il reste encore des choses à
-            faire.
-          </p>
-        </div>
-      )}
+      <GreetingCard
+        firstName={user.firstName}
+        dateLabel={dateLabel}
+        timeLabel={timeLabel}
+        currentMoment={currentMoment}
+        progress={currentMomentProgress}
+      />
 
       <MomentTabs
         initialActive={currentMoment}

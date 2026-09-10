@@ -114,6 +114,17 @@ export const MOMENT_LABELS: Record<DayMoment, string> = {
   SOIR: "Ce soir",
 };
 
+// Phrase courte d'ambiance pour la carte d'accueil (refonte visuelle) --
+// volontairement indépendante de l'état de complétude (le nombre de missions
+// restantes et la jauge portent déjà cette information séparément) : son
+// seul rôle est de situer le moment de la journée, ton neutre/positif
+// (DESIGN.md -- jamais culpabilisant).
+export const MOMENT_GREETING: Record<DayMoment, string> = {
+  MATIN: "Une nouvelle journée commence !",
+  RETOUR: "Bon retour ! Encore un peu à préparer.",
+  SOIR: "Prends ton temps pour tout préparer.",
+};
+
 /** Heure (0-23) dans SCHOOL_TIME_ZONE pour l'instant `now` donné.
  * `hourCycle: "h23"` + lecture via `formatToParts` (jamais `Number(format())`
  * directement) : certains moteurs ICU renvoient "24" plutôt que "00" pour

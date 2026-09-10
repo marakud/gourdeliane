@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   computeSoirCompletion,
+  countBlockProgress,
+  countSoirProgress,
   isBlockComplete,
   selectCurrentMomentCompletion,
+  selectCurrentMomentProgress,
   type SoirCompletionInput,
 } from "./day-completion";
 
@@ -161,5 +164,57 @@ describe("selectCurrentMomentCompletion (Story 3.2 -- correctif de revue, extrai
   it("selects soirComplete when currentMoment is SOIR, ignoring the other two", () => {
     expect(selectCurrentMomentCompletion("SOIR", false, false, true)).toBe(true);
     expect(selectCurrentMomentCompletion("SOIR", true, true, false)).toBe(false);
+  });
+});
+
+describe("countBlockProgress (refonte visuelle -- carte d'accueil)", () => {
+  it("counts done/total in a mixed block", () => {
+    expect(
+      countBlockProgress([{ checked: true }, { checked: false }, { checked: true }])
+    ).toEqual({ done: 2, total: 3 });
+  });
+
+  it("returns {done: 0, total: 0} for an empty block, never NaN", () => {
+    expect(countBlockProgress([])).toEqual({ done: 0, total: 0 });
+  });
+
+  it("returns {done: total, total} when everything is checked", () => {
+    expect(countBlockProgress([{ checked: true }, { checked: true }])).toEqual({
+      done: 2,
+      total: 2,
+    });
+  });
+});
+
+describe("countSoirProgress (refonte visuelle -- même agrégation que computeSoirCompletion)", () => {
+  it("aggregates sac + révisions + devoirs à rendre demain into one done/total", () => {
+    const input: SoirCompletionInput = {
+      sacGroups: [{ items: [{ checked: true }, { checked: false }] }],
+      revisionsItems: [{ checked: true }],
+      devoirsARendreDemain: [{ done: false }],
+    };
+    expect(countSoirProgress(input)).toEqual({ done: 2, total: 4 });
+  });
+
+  it("returns {done: 0, total: 0} when there is nothing at all to do", () => {
+    expect(countSoirProgress(EMPTY)).toEqual({ done: 0, total: 0 });
+  });
+});
+
+describe("selectCurrentMomentProgress (refonte visuelle -- carte d'accueil)", () => {
+  const matin = { done: 1, total: 4 };
+  const retour = { done: 2, total: 2 };
+  const soir = { done: 0, total: 3 };
+
+  it("selects matinProgress when currentMoment is MATIN, ignoring the other two", () => {
+    expect(selectCurrentMomentProgress("MATIN", matin, retour, soir)).toEqual(matin);
+  });
+
+  it("selects retourProgress when currentMoment is RETOUR, ignoring the other two", () => {
+    expect(selectCurrentMomentProgress("RETOUR", matin, retour, soir)).toEqual(retour);
+  });
+
+  it("selects soirProgress when currentMoment is SOIR, ignoring the other two", () => {
+    expect(selectCurrentMomentProgress("SOIR", matin, retour, soir)).toEqual(soir);
   });
 });
