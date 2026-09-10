@@ -53,9 +53,18 @@
   --color-card: var(--card);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) * 1.4);
-  --radius-2xl: calc(var(--radius) * 1.8);
+  /* Refonte visuelle -- radius-lg/xl/2xl fixés directement sur l'échelle de
+     DESIGN.md (rounded.sm/md/lg = 12/16/24px) plutôt que dérivés de
+     `--radius` par un multiplicateur : les ratios cibles (12:16:24 = 1:1.33:2)
+     ne correspondent à aucune chaîne de multiplicateurs cohérente avec les
+     autres tailles (sm/md/3xl/4xl, laissées dérivées, ne sont pas concernées
+     par DESIGN.md et n'ont pas besoin de changer). Effet global immédiat sur
+     tout l'app sans toucher un seul fichier composant : rounded-lg (boutons,
+     champs), rounded-xl (lignes de checklist, dialog), rounded-2xl (cartes
+     principales) l'utilisent déjà partout. */
+  --radius-lg: 0.75rem; /* 12px -- DESIGN.md rounded.sm (tags, boutons secondaires) */
+  --radius-xl: 1rem; /* 16px -- DESIGN.md rounded.md (checklist-item) */
+  --radius-2xl: 1.5rem; /* 24px -- DESIGN.md rounded.lg (moment-card) */
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
 }
@@ -110,6 +119,28 @@
   --subject-6: #ff7cd4;
   --subject-7: #2ecc71;
   --subject-8: #8c6e4e;
+
+  /* Refonte visuelle -- ambiances douces par moment de la journée (carte
+     d'accueil, Story onglets). `color-mix()` dérive chaque dégradé des
+     tokens de marque déjà theme-aware (--accent/--subject-2/--primary,
+     --surface-base) : pas de valeurs -dark séparées à maintenir, le mélange
+     suit automatiquement la bascule .dark le jour où elle sera activée.
+     Mélanges à faible dosage (10-16%) -- jamais un dégradé saturé/flashy. */
+  --gradient-matin: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--accent) 14%, var(--surface-base)) 0%,
+    var(--surface-base) 100%
+  );
+  --gradient-retour: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--subject-2) 12%, var(--surface-base)) 0%,
+    var(--surface-base) 100%
+  );
+  --gradient-soir: linear-gradient(
+    180deg,
+    color-mix(in oklch, var(--primary) 16%, var(--surface-base)) 0%,
+    var(--surface-base) 100%
+  );
 }
 
 /*
@@ -157,6 +188,19 @@
   --surface-base: #15132b;
 }
 
+/* Refonte visuelle -- élévation douce teintée violet (DESIGN.md "Elevation &
+   Depth") plutôt qu'une ombre neutre grise. Deux couches (portée large très
+   diffuse + contact court) pour un rendu naturel sans halo dur. Utilitaire
+   Tailwind v4 (`@utility`), disponible comme n'importe quelle classe
+   `shadow-*` -- `shadow-brand` sur les cartes qui l'adoptent (à partir de
+   l'étape 2, cette classe reste inutilisée tant qu'aucun composant ne
+   l'applique). */
+@utility shadow-brand {
+  box-shadow:
+    0 10px 24px -12px oklch(0.55 0.24 290 / 30%),
+    0 2px 6px -2px oklch(0.55 0.24 290 / 12%);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -166,5 +210,22 @@
   }
   html {
     @apply font-sans;
+  }
+
+  /* Refonte visuelle -- `prefers-reduced-motion` prescrit par EXPERIENCE.md
+     depuis l'origine du projet mais jamais implémenté (aucune occurrence
+     trouvée dans le code applicatif avant ce changement). Neutralise toute
+     animation/transition CSS globalement -- inclut les micro-animations de
+     coche et célébrations ajoutées à partir de l'étape 4, sans qu'elles aient
+     à gérer cette préférence individuellement. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
