@@ -54,7 +54,7 @@ development_status:
   epic-2-retrospective: optional
 
   epic-3: backlog
-  3-1-recevoir-mes-rappels-quotidiens: backlog
+  3-1-recevoir-mes-rappels-quotidiens: review
   3-2-voir-un-repli-visuel-si-la-notification-n-est-pas-arrivée: backlog
   3-3-activer-les-rappels-sur-iphone-ipad: backlog
   3-4-choisir-mes-heures-de-rappel: backlog

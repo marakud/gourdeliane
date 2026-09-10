@@ -14,10 +14,12 @@ import {
   createRetourChecklistItem,
 } from "@/actions/checklist";
 import { setCurrentWeekParity, setFirstNameAction } from "@/actions/settings";
+import { subscribeToPush } from "@/actions/push";
 import { SubjectItemsManager } from "@/components/checklist/subject-items-manager";
 import { FixedItemsManager } from "@/components/checklist/fixed-items-manager";
 import { WeekParityCard } from "@/components/settings/week-parity-card";
 import { FirstNameCard } from "@/components/settings/first-name-card";
+import { NotificationsSection } from "@/components/settings/notifications-section";
 
 export default async function ReglagesPage() {
   // Force le rendu dynamique à chaque requête (AGENTS.md -- modèle de cache
@@ -59,6 +61,13 @@ export default async function ReglagesPage() {
       <FirstNameCard firstName={user.firstName} onSetFirstName={setFirstNameAction} />
 
       <WeekParityCard currentParity={currentParity} onSetParity={setCurrentWeekParity} />
+
+      {process.env.VAPID_PUBLIC_KEY && (
+        <NotificationsSection
+          vapidPublicKey={process.env.VAPID_PUBLIC_KEY}
+          onSubscribe={subscribeToPush}
+        />
+      )}
 
       <SubjectItemsManager
         subjects={subjects.map((subject) => ({

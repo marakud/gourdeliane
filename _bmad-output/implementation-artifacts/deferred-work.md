@@ -237,3 +237,19 @@
 - source_spec: (retour utilisateur -- Accueil : afficher un seul moment contextuel)
   summary: The frozen spec's Boundaries section only authorizes removing `MomentSoirCard`'s own redundant title -- extending the same "hideTitle" treatment to `components/checklist/fixed-checklist.tsx` (Matin/Retour) was introduced only in the spec's non-frozen Code Map/implementation, not called out in the frozen Intent/Boundaries block itself.
   evidence: Blind-hunter review. Not a functional bug -- the extension is a direct, low-risk application of the exact same principle the frozen spec already approved (title redundant with the tab label above it) -- but a reviewer trusting only the frozen section could miss that `FixedChecklist` also lost its heading/landmark for Matin/Retour. Documented after the fact in this story's own Spec Change Log; worth being more explicit in the frozen Boundaries text next time an analogous "apply this same principle to a sibling component" extension comes up during implementation.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-1-recevoir-mes-rappels-quotidiens.md`
+  summary: `actions/push.ts::subscribeToPush` only checks `endpoint`/`p256dh`/`auth` for non-emptiness, never their shape (e.g. `endpoint` isn't verified to look like a URL).
+  evidence: Blind-hunter and edge-case-hunter reviews, both independently. Low real-world risk -- the client always sends a well-formed value straight from `pushManager.subscribe().toJSON()`, a real browser API, not free-form user input. A malformed value from a direct/malicious call would only surface later as a non-404/410 error in `lib/push.ts`, logged forever with no cleanup path -- worth a proper URL/shape validation (and dead-letter handling for permanently-failing subscriptions) if this action is ever exposed more broadly.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-1-recevoir-mes-rappels-quotidiens.md`
+  summary: `app/api/cron/[moment]/route.ts` calls `getScheduleForUser(user.id)` solely to read `noSchoolDays`, discarding `subjects`/`scheduleSlots` -- three Prisma queries run where one would do.
+  evidence: Blind-hunter review. Negligible at this app's real usage volume (one cron invocation per moment per day, single-family data). Worth a dedicated minimal query (matching AD-1's per-layer-minimalism convention) if this route or its call pattern ever changes.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-1-recevoir-mes-rappels-quotidiens.md`
+  summary: `data/push-subscription.ts::saveSubscription`'s upsert unconditionally reassigns `userId` in its `update` clause -- re-subscribing an existing `endpoint` under a different `userId` would silently transfer ownership of that row rather than being rejected.
+  evidence: Blind-hunter review. Harmless today (exactly one seed user, `ensureSeedUser()`) -- same "future multi-user" gap category already accepted for several other findings in this file (e.g. the Story 2.4 `subjectId`/`scheduleSlotId` ownership-check entries). Worth guarding once/if the app ever supports more than one real user.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-3-1-recevoir-mes-rappels-quotidiens.md`
+  summary: `components/settings/notifications-section.tsx::handleActivate` always calls `navigator.serviceWorker.register("/sw.js")` even when the mount effect already fetched a registration, and (unlike the mount effect) has no `cancelled`-style guard against the component unmounting mid-flight -- a `setState` after unmount is possible in a narrow window (click then immediately navigate away).
+  evidence: Blind-hunter review. The redundant `register()` call is harmless (browsers dedupe registrations for the same URL); the missing unmount guard is low-severity UI polish (a React dev-mode warning at worst, no user-visible effect) in a very rare interaction pattern. Worth fixing alongside any other future touch of this component.

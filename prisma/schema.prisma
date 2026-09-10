@@ -42,6 +42,7 @@ model User {
   fixedChecklistDefaultsSeeds FixedChecklistDefaultsSeed[]
   devoirs                     Devoir[]
   dayCompletions              DayCompletion[]
+  pushSubscriptions           PushSubscription[]
 }
 
 // Jour de la semaine d'un créneau récurrent.
@@ -264,4 +265,24 @@ model DayCompletion {
   updatedAt DateTime @updatedAt
 
   @@unique([userId, date, moment])
+}
+
+// Abonnement Web Push (Story 3.1, FR-10/AD-8) -- un enregistrement par
+// navigateur/appareil abonné (un même utilisateur peut avoir plusieurs
+// abonnements, ex. téléphone + tablette). `endpoint` est unique côté
+// navigateur (fourni par le push service, Google/Mozilla/etc.) -- s'abonner
+// à nouveau depuis le même appareil réutilise donc la même ligne (upsert),
+// jamais un doublon. `p256dh`/`auth` sont les clés de chiffrement du
+// PushSubscriptionKeys renvoyées par `pushManager.subscribe()`, nécessaires
+// à `web-push` pour chiffrer chaque notification.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
