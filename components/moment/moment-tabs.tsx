@@ -7,6 +7,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
+import { DoorOpen, Moon, Sun, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MOMENT_LABELS, type DayMoment } from "@/domain/school-day";
 
@@ -37,6 +38,19 @@ const TABS: { id: DayMoment; label: string }[] = MOMENT_ORDER.map((id) => ({
   id,
   label: MOMENT_LABELS[id],
 }));
+
+// Refonte visuelle -- une icône par onglet ("boutons plus vivants" plutôt
+// que du texte seul). Vit ici, jamais dans `domain/school-day.ts` : une
+// icône est un composant React (dépendance UI), incompatible avec un module
+// domaine pur (AD-1). `DoorOpen` plutôt que `Home` pour Retour : cette
+// dernière icône est déjà utilisée par la nav basse (`components/nav/
+// bottom-nav.tsx`) pour "Accueil" -- la réutiliser ici pour un sens
+// différent ("rentrer de l'école") aurait créé une ambiguïté visuelle.
+const MOMENT_ICON: Record<DayMoment, LucideIcon> = {
+  MATIN: Sun,
+  RETOUR: DoorOpen,
+  SOIR: Moon,
+};
 
 export function MomentTabs({ initialActive, matin, retour, soir }: MomentTabsProps) {
   const [active, setActive] = useState<DayMoment>(initialActive);
@@ -98,6 +112,7 @@ export function MomentTabs({ initialActive, matin, retour, soir }: MomentTabsPro
       >
         {TABS.map((tab, index) => {
           const isActive = tab.id === active;
+          const Icon = MOMENT_ICON[tab.id];
           return (
             <button
               key={tab.id}
@@ -114,12 +129,13 @@ export function MomentTabs({ initialActive, matin, retour, soir }: MomentTabsPro
               onKeyDown={(event) => handleKeyDown(event, index)}
               className={cn(
                 // Zone de tap >= 44px et texte >= 16px (plancher d'accessibilité).
-                "min-h-[44px] flex-1 rounded-xl text-base font-semibold transition-colors",
+                "flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl text-base font-semibold transition-colors",
                 isActive
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
+              <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
               {tab.label}
             </button>
           );
