@@ -8,6 +8,8 @@
 // (persistance après une coche) -- une seule implémentation, jamais deux
 // calculs indépendants qui pourraient diverger (AD-5).
 
+import type { DayMoment } from "./school-day";
+
 export const DAY_COMPLETION_MOMENT_SOIR = "SOIR" as const;
 
 interface SacGroupLike {
@@ -31,10 +33,13 @@ export interface SoirCompletionInput {
   devoirsARendreDemain: readonly DevoirARendreDemainLike[];
 }
 
-/** Un bloc sans objet (ex. Sac un jour sans cours demain) compte comme
- * trivialement complet -- sinon un soir sans rien à faire ne pourrait jamais
- * être "complet" (I/O matrix spec 2.7). */
-function isBlockComplete(items: readonly ChecklistItemLike[]): boolean {
+/** Un bloc sans objet (ex. Sac un jour sans cours demain, ou Retour sans
+ * item configuré -- Story 3.2) compte comme trivialement complet -- sinon un
+ * moment sans rien à faire ne pourrait jamais être "complet" (I/O matrix spec
+ * 2.7 et spec 3.2). Exportée (Story 3.2) : Matin et Retour ont exactement la
+ * même forme de complétude que Sac/Révisions (`{checked: boolean}[]`), donc
+ * réutilisent cette fonction plutôt que de dupliquer la règle. */
+export function isBlockComplete(items: readonly ChecklistItemLike[]): boolean {
   return items.length === 0 || items.every((item) => item.checked);
 }
 
@@ -66,4 +71,22 @@ export function computeSoirCompletion(input: SoirCompletionInput): boolean {
   );
 
   return sacComplete && revisionsComplete && devoirsComplete;
+}
+
+/**
+ * Sélectionne, parmi les trois complétudes déjà calculées séparément, celle
+ * du moment courant (Story 3.2, repli visuel) -- extraite en fonction pure
+ * testable plutôt que laissée en ternaire dans `app/(accueil)/page.tsx`
+ * (correctif de revue : un branchement inversé/permuté ne serait détecté par
+ * aucun test tant que cette sélection restait inline).
+ */
+export function selectCurrentMomentCompletion(
+  currentMoment: DayMoment,
+  matinComplete: boolean,
+  retourComplete: boolean,
+  soirComplete: boolean
+): boolean {
+  if (currentMoment === "MATIN") return matinComplete;
+  if (currentMoment === "RETOUR") return retourComplete;
+  return soirComplete;
 }

@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/utils";
-import type { DayMoment } from "@/domain/school-day";
+import { MOMENT_LABELS, type DayMoment } from "@/domain/school-day";
 
 // Retour utilisateur -- Accueil affichait "Ce soir"/"Ce matin"/"Retour"
 // empilés et dépliés en permanence ("beaucoup d'information" pour un
@@ -28,11 +28,15 @@ export interface MomentTabsProps {
   soir: ReactNode;
 }
 
-const TABS: { id: DayMoment; label: string }[] = [
-  { id: "MATIN", label: "Ce matin" },
-  { id: "RETOUR", label: "Retour" },
-  { id: "SOIR", label: "Ce soir" },
-];
+// Ordre d'affichage des onglets, explicite (correctif de revue) -- ne repose
+// jamais sur l'ordre d'insertion des clés de `MOMENT_LABELS`, qui pourrait
+// changer silencieusement sans réordonner intentionnellement les onglets.
+const MOMENT_ORDER: DayMoment[] = ["MATIN", "RETOUR", "SOIR"];
+
+const TABS: { id: DayMoment; label: string }[] = MOMENT_ORDER.map((id) => ({
+  id,
+  label: MOMENT_LABELS[id],
+}));
 
 export function MomentTabs({ initialActive, matin, retour, soir }: MomentTabsProps) {
   const [active, setActive] = useState<DayMoment>(initialActive);

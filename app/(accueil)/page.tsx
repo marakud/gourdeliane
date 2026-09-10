@@ -19,6 +19,7 @@ import {
   getCurrentMoment,
   getTodaySchoolDate,
   getTomorrowSchoolDate,
+  MOMENT_LABELS,
   schoolDateToIso,
   schoolDateToWeekday,
   SCHOOL_TIME_ZONE,
@@ -37,7 +38,11 @@ import {
   type ChecklistSubjectGroupInput,
 } from "@/domain/checklist";
 import { computeDaysRemaining } from "@/domain/homework";
-import { computeSoirCompletion } from "@/domain/day-completion";
+import {
+  computeSoirCompletion,
+  isBlockComplete,
+  selectCurrentMomentCompletion,
+} from "@/domain/day-completion";
 import {
   toggleMatinChecklistItem,
   toggleRetourChecklistItem,
@@ -283,6 +288,13 @@ export default async function AccueilPage() {
     }))
   );
 
+  // Complétude "Ce matin"/"Retour" (Story 3.2) : même fonction pure
+  // (`isBlockComplete`) et même convention "bloc vide = trivialement
+  // complet" que Sac/Révisions ci-dessus (I/O matrix spec 3.2) -- alimente le
+  // repli visuel plus bas, jamais un second calcul divergent.
+  const matinComplete = isBlockComplete(matinChecklist);
+  const retourComplete = isBlockComplete(retourChecklist);
+
   const revisionsChecklist = deriveRevisionsChecklist(
     todaySubjects.map((subject) => ({
       id: subject.id,
@@ -388,6 +400,20 @@ export default async function AccueilPage() {
   // (bascule 100% client, aucun rechargement).
   const currentMoment = getCurrentMoment(now);
 
+  // Repli visuel (Story 3.2, FR-11) : recalculé 100% en direct à partir de
+  // l'état réel du moment courant déjà chargé ci-dessus (jamais une lecture
+  // de `DayCompletion` ni un état côté client Notification/Service Worker,
+  // Boundaries spec 3.2) -- porte uniquement sur le moment courant, jamais
+  // les trois à la fois. Sélection extraite en fonction pure testée
+  // (correctif de revue) plutôt qu'un ternaire inline, pour qu'un
+  // branchement permuté (ex. Matin<->Retour) soit détecté par un test.
+  const currentMomentComplete = selectCurrentMomentCompletion(
+    currentMoment,
+    matinComplete,
+    retourComplete,
+    soirComplete
+  );
+
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-8">
       <div>
@@ -398,6 +424,26 @@ export default async function AccueilPage() {
           Nous sommes le {dateLabel}, il est {timeLabel}.
         </p>
       </div>
+
+      {!currentMomentComplete && (
+        // Repli visuel (Story 3.2, FR-11, AD-8) : pas un composant
+        // `Alert`/`Banner` générique (Boundaries spec 3.2) -- bloc inline
+        // propre à cet écran, même pattern que les autres blocs rounded-2xl
+        // de cette page (ex. `MomentSoirCard`). Ton neutre/incitatif : teinte
+        // douce `accent` (jamais `destructive`/rouge), aucun mot comme
+        // "oublié". Ne porte que sur `currentMoment` (jamais les trois à la
+        // fois) et disparaît d'elle-même au prochain rendu dès que ce moment
+        // redevient complet -- pas de dismiss manuel à mémoriser.
+        <div
+          role="status"
+          className="rounded-2xl bg-accent/10 p-4 ring-1 ring-border"
+        >
+          <p className="text-base font-medium text-foreground">
+            {MOMENT_LABELS[currentMoment]} : il reste encore des choses à
+            faire.
+          </p>
+        </div>
+      )}
 
       <MomentTabs
         initialActive={currentMoment}

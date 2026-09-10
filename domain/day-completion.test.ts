@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { computeSoirCompletion, type SoirCompletionInput } from "./day-completion";
+import {
+  computeSoirCompletion,
+  isBlockComplete,
+  selectCurrentMomentCompletion,
+  type SoirCompletionInput,
+} from "./day-completion";
 
 const EMPTY: SoirCompletionInput = {
   sacGroups: [],
@@ -121,5 +126,40 @@ describe("computeSoirCompletion (Story 2.7, FR-20 -- I/O matrix spec 2.7)", () =
     };
 
     expect(computeSoirCompletion(input)).toBe(false);
+  });
+});
+
+describe("isBlockComplete (Story 3.2 -- exportée pour le repli visuel Matin/Retour)", () => {
+  it("treats an empty block (no item configured) as trivially complete", () => {
+    expect(isBlockComplete([])).toBe(true);
+  });
+
+  it("is complete when every item is checked", () => {
+    expect(
+      isBlockComplete([{ checked: true }, { checked: true }])
+    ).toBe(true);
+  });
+
+  it("is incomplete when a single item is unchecked", () => {
+    expect(
+      isBlockComplete([{ checked: true }, { checked: false }])
+    ).toBe(false);
+  });
+});
+
+describe("selectCurrentMomentCompletion (Story 3.2 -- correctif de revue, extraite du ternaire inline de la page)", () => {
+  it("selects matinComplete when currentMoment is MATIN, ignoring the other two", () => {
+    expect(selectCurrentMomentCompletion("MATIN", true, false, false)).toBe(true);
+    expect(selectCurrentMomentCompletion("MATIN", false, true, true)).toBe(false);
+  });
+
+  it("selects retourComplete when currentMoment is RETOUR, ignoring the other two", () => {
+    expect(selectCurrentMomentCompletion("RETOUR", false, true, false)).toBe(true);
+    expect(selectCurrentMomentCompletion("RETOUR", true, false, true)).toBe(false);
+  });
+
+  it("selects soirComplete when currentMoment is SOIR, ignoring the other two", () => {
+    expect(selectCurrentMomentCompletion("SOIR", false, false, true)).toBe(true);
+    expect(selectCurrentMomentCompletion("SOIR", true, true, false)).toBe(false);
   });
 });

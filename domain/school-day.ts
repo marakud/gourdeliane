@@ -98,6 +98,22 @@ export function schoolDateToIso(date: SchoolDate): string {
 // heures).
 export type DayMoment = "MATIN" | "RETOUR" | "SOIR";
 
+// Libellés affichés à l'enfant pour chaque moment -- source unique
+// réutilisée à l'identique par `components/moment/moment-tabs.tsx` (onglets)
+// ET `app/(accueil)/page.tsx` (repli visuel, Story 3.2), jamais dupliquée.
+// Vit ici (module pur, sans "use client") plutôt que dans moment-tabs.tsx :
+// un Server Component qui importerait une valeur non-composant depuis un
+// module "use client" ne reçoit qu'une référence client, pas l'objet réel
+// (cf. node_modules/next/dist/docs/01-app/03-api-reference/01-directives --
+// "use client" marque TOUS ses exports comme frontière serveur/client, pas
+// seulement les composants) -- constaté en vérification manuelle : la
+// bannière de la Story 3.2 s'affichait vide sans ce déplacement.
+export const MOMENT_LABELS: Record<DayMoment, string> = {
+  MATIN: "Ce matin",
+  RETOUR: "Retour",
+  SOIR: "Ce soir",
+};
+
 /** Heure (0-23) dans SCHOOL_TIME_ZONE pour l'instant `now` donné.
  * `hourCycle: "h23"` + lecture via `formatToParts` (jamais `Number(format())`
  * directement) : certains moteurs ICU renvoient "24" plutôt que "00" pour
