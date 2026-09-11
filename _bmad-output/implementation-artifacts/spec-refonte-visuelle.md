@@ -61,9 +61,12 @@ Après chaque étape : fichiers modifiés annoncés, choix expliqués, responsiv
 - `lib/use-just-completed.ts` + `components/moment/celebration-badge.tsx` (nouveaux, extraits de `MomentSoirCard`/Story 2.7) : célébration "Tout est prêt !" + étincelles, étendue à `FixedChecklist` (Matin/Retour n'avaient pas de "moment card" propre). Sac/Révisions ne gagnent pas leur propre badge -- déjà couverts par celui de `MomentSoirCard` (éviter la redondance).
 - Toutes les animations respectent `prefers-reduced-motion` (étape 1, aucun code supplémentaire requis par composant).
 
-### Étape 5 -- Navigation supérieure et inférieure -- ⏳ pas commencée
+### Étape 5 -- Navigation supérieure et inférieure -- ✅ commit à venir
 
-Prévu : petit symbole/logo en barre haute (`components/nav/top-bar.tsx`), indicateur d'onglet actif plus vivant en bas (`components/nav/bottom-nav.tsx` -- pastille/fond coloré plutôt qu'un simple changement de couleur de texte), safe areas iPhone, zones de tap préservées.
+- `components/nav/top-bar.tsx` : icône `Backpack` ajoutée avant le nom "CartableFlow" -- même icône que le filigrane de la carte d'accueil (`greeting-card.tsx`), pas une nouvelle icône d'identité.
+- `components/nav/bottom-nav.tsx` : pastille (`bg-primary/10`, `rounded-full`) derrière l'icône de l'onglet actif plutôt qu'un simple changement de couleur de texte, cf. `.nav-pill` du mockup `key-screens.html`. Zone de tap ≥44px inchangée (le padding est sur la pastille interne, pas sur la zone cliquable). `padding-bottom: env(safe-area-inset-bottom)` ajouté pour la zone sûre iPhone.
+- `app/layout.tsx` : export `viewport` avec `viewportFit: "cover"` -- requis pour que `env(safe-area-inset-bottom)` résolve une vraie valeur sur iPhone plutôt que 0.
+- Vérifié : `tsc`/`next build`, `eslint`, 251 tests, responsive desktop + mobile 375px (Browser pane).
 
 ### Étape 6 -- États vides illustrés -- ⏳ pas commencée
 
@@ -77,4 +80,4 @@ Actuellement une coquille vide (`app/progression/page.tsx`). Voir "Décisions ac
 
 ## État Git
 
-Tous les commits des étapes 1-4 (+ Story 3.2, faite juste avant) sont **poussés sur `origin/master`** (`git log` fera foi de l'état réel -- ne pas se fier à ce fichier pour le SHA le plus récent, seulement pour le contexte). Prochaine étape à reprendre : **étape 5**, en attente d'un feu vert utilisateur (dernier échange : proposition d'enchaîner sur l'étape 5, réponse "non, je continue sur un autre poste").
+Étapes 1-5 commitées localement (`git log` fera foi de l'état réel -- ne pas se fier à ce fichier pour le SHA le plus récent, seulement pour le contexte). Pas de push automatique sans demande explicite. Prochaine étape à reprendre : **étape 6** (états vides illustrés), en attente d'un feu vert utilisateur.

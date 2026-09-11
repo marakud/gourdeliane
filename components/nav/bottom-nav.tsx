@@ -31,7 +31,12 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Navigation principale"
-      className="sticky bottom-0 z-10 border-t border-border bg-card"
+      // Refonte visuelle étape 5 -- padding-bottom additionnel = zone sûre
+      // iPhone (encoche/barre d'accueil), cf. `viewport-fit=cover` posé sur
+      // <html> dans app/layout.tsx (sans lui `env()` resterait figé à 0 même
+      // sur iPhone). `max()` évite de perdre le padding existant sur les
+      // appareils sans zone sûre (valeur env() alors égale à 0).
+      className="sticky bottom-0 z-10 border-t border-border bg-card pb-[max(0px,env(safe-area-inset-bottom))]"
     >
       <ul className="mx-auto flex max-w-lg items-stretch justify-around">
         {TABS.map(({ href, label, fullLabel, icon: Icon }) => {
@@ -45,13 +50,26 @@ export function BottomNav() {
                 aria-current={isActive ? "page" : undefined}
                 className={cn(
                   // Zone de tap >= 44px (plancher d'accessibilité, cf. spec 1.1)
+                  // -- inchangée : le padding est sur la pastille interne
+                  // (ci-dessous), pas sur cette zone de tap.
                   "flex min-h-[56px] flex-col items-center justify-center gap-1 py-1.5 transition-colors",
                   isActive
                     ? "text-primary"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <Icon aria-hidden="true" className="size-6" />
+                {/* Refonte visuelle étape 5 -- pastille/fond coloré derrière
+                    l'icône active plutôt qu'un simple changement de couleur de
+                    texte (demande explicite du plan), cf. mockup
+                    ux-college-6eme-2026-09-02 `.nav-pill`. */}
+                <span
+                  className={cn(
+                    "flex h-7 w-10 items-center justify-center rounded-full transition-colors",
+                    isActive && "bg-primary/10"
+                  )}
+                >
+                  <Icon aria-hidden="true" className="size-6" />
+                </span>
                 {/* text-base (16px) : plancher d'accessibilité de la spec 1.1 */}
                 <span className="text-base leading-none">{label}</span>
               </Link>

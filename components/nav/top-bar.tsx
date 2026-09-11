@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Settings } from "lucide-react";
+import { Backpack, Settings } from "lucide-react";
 
 // Barre supérieure minimale : logo/nom de l'app + accès à Réglages.
 // Réglages est volontairement hors de la barre de navigation basse à 3 onglets
@@ -8,7 +8,11 @@ import { Settings } from "lucide-react";
 export function TopBar() {
   return (
     <header className="flex items-center justify-between border-b border-border px-4 py-3">
-      <span className="font-heading text-lg font-semibold text-primary">
+      <span className="flex items-center gap-2 font-heading text-lg font-semibold text-primary">
+        {/* Refonte visuelle étape 5 -- petit symbole avant le nom, même icône
+            cartable que la carte d'accueil (components/moment/greeting-card.tsx) :
+            une seule icône d'identité pour l'app, pas une nouvelle. */}
+        <Backpack aria-hidden="true" className="size-5" strokeWidth={2.25} />
         CartableFlow
       </span>
       <Link
