@@ -12,7 +12,18 @@ export default async function ProgressionPage() {
   await connection();
 
   const user = await ensureSeedUser();
-  const streak = await getStreakForUser(user.id, new Date());
+  // Le streak est un affichage secondaire, jamais un chemin critique --
+  // une donnée historique inattendue ne doit jamais faire planter tout
+  // l'écran Progression (contrairement à un échec sur Accueil/EDT, qui
+  // resterait un vrai bug bloquant). En cas d'erreur, `console.error` reste
+  // visible dans les logs serveur (Vercel) pour diagnostiquer, l'écran
+  // retombe sur 0/0 -- jamais un streak inventé.
+  let streak = { current: 0, best: 0 };
+  try {
+    streak = await getStreakForUser(user.id, new Date());
+  } catch (error) {
+    console.error("getStreakForUser a échoué, repli sur 0/0 :", error);
+  }
   const badges = computeBadges(streak.best);
 
   return (

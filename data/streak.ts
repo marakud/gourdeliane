@@ -45,7 +45,16 @@ export async function getStreakForUser(
   }));
 
   const todayIso = schoolDateToIso(getTodaySchoolDate(now));
-  const earliestIso = records[0].dateIso; // `rows` déjà triées par date croissante
+  // `records[0].dateIso` ("rows" déjà triées par date croissante) borné à un
+  // an en arrière : sans cette borne, une ligne historique très ancienne (ou
+  // une date corrompue) ferait tourner la reconstruction des jours scolaires
+  // ci-dessous sur une plage arbitrairement grande -- un "meilleur streak"
+  // au-delà d'un an n'a de toute façon aucun sens produit ici (FR-14 ne parle
+  // que de paliers jusqu'à 100 jours, domain/badges.ts).
+  const earliestIso =
+    records[0].dateIso > shiftIsoDays(todayIso, -366)
+      ? records[0].dateIso
+      : shiftIsoDays(todayIso, -366);
 
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const weekAReferenceMondayIso = user.weekAReferenceMonday
