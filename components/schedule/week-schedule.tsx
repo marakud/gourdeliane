@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Plus } from "lucide-react";
+import { Plus, Sofa } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SlotRow } from "@/components/schedule/slot-row";
 import { SlotFormDialog } from "@/components/schedule/slot-form-dialog";
 import { NoSchoolDayPanel } from "@/components/schedule/no-school-day-panel";
 import { WeekGrid } from "@/components/schedule/week-grid";
+import { EmptyState } from "@/components/ui/empty-state";
 import { WEEKDAYS, WEEKDAY_LABELS, type WeekParity, type Weekday } from "@/domain/schedule";
 
 export interface WeekScheduleSlot {
@@ -110,9 +111,15 @@ export function WeekSchedule({
                   ))}
                 </ul>
               ) : (
-                <p className="px-1 py-2 text-sm text-muted-foreground">
-                  Aucun créneau.
-                </p>
+                // Refonte visuelle étape 7 -- même icône/famille que DayView
+                // (Sofa) : même concept ("rien de prévu"), à l'échelle d'un
+                // jour de cette vue liste.
+                <EmptyState
+                  icon={Sofa}
+                  message="Aucun créneau."
+                  layout="inline"
+                  className="px-1 py-2 text-sm"
+                />
               )}
             </section>
           );

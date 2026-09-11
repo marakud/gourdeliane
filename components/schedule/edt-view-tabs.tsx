@@ -1,6 +1,12 @@
 "use client";
 
 import { useRef, useState, type KeyboardEvent } from "react";
+import {
+  CalendarCheck,
+  CalendarClock,
+  CalendarRange,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   DayView,
@@ -36,10 +42,16 @@ export interface EdtViewTabsProps {
 
 type ViewId = "today" | "tomorrow" | "week";
 
-const TABS: { id: ViewId; label: string }[] = [
-  { id: "today", label: "Aujourd'hui" },
-  { id: "tomorrow", label: "Demain" },
-  { id: "week", label: "Semaine" },
+// Refonte visuelle étape 7 -- une icône par onglet, même traitement que
+// MomentTabs (étape 3, components/moment/moment-tabs.tsx). Famille
+// "Calendar*" cohérente entre les trois (contrairement à Matin/Retour/Soir,
+// pas d'icône déjà prise ailleurs sur cet écran à éviter) : `CalendarCheck`
+// (aujourd'hui, en cours), `CalendarClock` (demain, à venir), `CalendarRange`
+// (semaine, une plage de jours).
+const TABS: { id: ViewId; label: string; icon: LucideIcon }[] = [
+  { id: "today", label: "Aujourd'hui", icon: CalendarCheck },
+  { id: "tomorrow", label: "Demain", icon: CalendarClock },
+  { id: "week", label: "Semaine", icon: CalendarRange },
 ];
 
 export function EdtViewTabs({ today, tomorrow, week }: EdtViewTabsProps) {
@@ -77,6 +89,7 @@ export function EdtViewTabs({ today, tomorrow, week }: EdtViewTabsProps) {
       >
         {TABS.map((tab, index) => {
           const isActive = tab.id === active;
+          const Icon = tab.icon;
           return (
             <button
               key={tab.id}
@@ -93,12 +106,13 @@ export function EdtViewTabs({ today, tomorrow, week }: EdtViewTabsProps) {
               onKeyDown={(event) => handleKeyDown(event, index)}
               className={cn(
                 // Zone de tap >= 44px et texte >= 16px (plancher d'accessibilité).
-                "min-h-[44px] flex-1 rounded-xl text-base font-semibold transition-colors",
+                "flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-xl text-base font-semibold transition-colors",
                 isActive
                   ? "bg-primary text-primary-foreground"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
+              <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
               {tab.label}
             </button>
           );

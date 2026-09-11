@@ -76,9 +76,14 @@ Après chaque étape : fichiers modifiés annoncés, choix expliqués, responsiv
 - **Bug préexistant corrigé en vérifiant cette étape** (pas introduit par la refonte) : le message vide de `WeekGrid` était invisible avant ce commit -- premier enfant `position: absolute` de la grille, entièrement recouvert par les colonnes de jours (`bg-card`, `position: relative`, plus tard dans le DOM, donc peintes par-dessus). `z-10` ajouté.
 - Vérifié : `next build`, `eslint`, 251 tests, les 4 états vides contrôlés visuellement (Browser pane) après le correctif.
 
-### Étape 7 -- Emploi du temps -- ⏳ pas commencée
+### Étape 7 -- Emploi du temps -- ✅ commit à venir
 
-Note : `SubjectTag` (icônes par matière) et les rayons/ombres globaux impactent déjà visuellement l'EDT depuis les étapes 1 et 4 (composants partagés) -- cette étape portera sur ce qui reste propre à l'écran EDT lui-même.
+Note : `SubjectTag` (icônes par matière) et les rayons/ombres globaux impactent déjà visuellement l'EDT depuis les étapes 1 et 4 (composants partagés) -- cette étape a porté sur ce qui restait propre à l'écran EDT lui-même :
+
+- `components/schedule/edt-view-tabs.tsx` : une icône par onglet Aujourd'hui/Demain/Semaine (`CalendarCheck`/`CalendarClock`/`CalendarRange`), même traitement que `MomentTabs` (étape 3).
+- `components/schedule/week-schedule.tsx` : message "Aucun créneau." (vue liste mobile, un par jour de la semaine) passé par `EmptyState` (`Sofa`, étape 6), pour la même cohérence que `DayView`/`WeekGrid`.
+- Hors périmètre volontairement : `NoSchoolDayPanel` ("Aucun jour marqué...") -- texte de configuration, pas un message adressé à l'enfant comme les autres états vides.
+- Vérifié : `next build`, `eslint`, 251 tests, les 3 onglets + la vue liste mobile contrôlés visuellement (Browser pane, desktop + mobile 375px).
 
 ### Étape 8 -- Page Progression -- ⏳ pas commencée
 
@@ -86,4 +91,4 @@ Actuellement une coquille vide (`app/progression/page.tsx`). Voir "Décisions ac
 
 ## État Git
 
-Étapes 1-6 commitées localement (`git log` fera foi de l'état réel -- ne pas se fier à ce fichier pour le SHA le plus récent, seulement pour le contexte). Pas de push automatique sans demande explicite. Prochaine étape à reprendre : **étape 7** (Emploi du temps), en attente d'un feu vert utilisateur.
+Étapes 1-7 commitées localement (`git log` fera foi de l'état réel -- ne pas se fier à ce fichier pour le SHA le plus récent, seulement pour le contexte). Pas de push automatique sans demande explicite. Prochaine étape à reprendre : **étape 8** (page Progression), en attente d'un feu vert utilisateur.
