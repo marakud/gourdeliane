@@ -2,7 +2,7 @@
 title: 'Refonte visuelle -- CartableFlow'
 type: 'feature'
 created: '2026-09-10'
-status: 'in-progress'
+status: 'done'
 ---
 
 # Refonte visuelle CartableFlow -- suivi de progression
@@ -85,10 +85,17 @@ Note : `SubjectTag` (icônes par matière) et les rayons/ombres globaux impacten
 - Hors périmètre volontairement : `NoSchoolDayPanel` ("Aucun jour marqué...") -- texte de configuration, pas un message adressé à l'enfant comme les autres états vides.
 - Vérifié : `next build`, `eslint`, 251 tests, les 3 onglets + la vue liste mobile contrôlés visuellement (Browser pane, desktop + mobile 375px).
 
-### Étape 8 -- Page Progression -- ⏳ pas commencée
+### Étape 8 -- Page Progression -- ✅ commit à venir
 
-Actuellement une coquille vide (`app/progression/page.tsx`). Voir "Décisions actées" ci-dessus pour le périmètre données réelles vs emplacements préparés.
+Construite avec les vraies données déjà disponibles, sans migration Prisma (décisions actées ci-dessus) :
+
+- `domain/streak.ts` (nouveau, pur, testé) : `computeStreak` -- streak courant + record personnel à partir des lignes `DayCompletion(moment=SOIR)` déjà persistées (Story 2.7). **Limite connue, assumée et documentée dans le fichier** : une ligne n'existe que si l'enfant a interagi avec une checklist ce soir-là -- un soir sans rien à cocher jamais ouvert compte comme une absence plutôt que trivialement complet (le corriger demanderait de rejouer rétroactivement Sac/Révisions pour chaque jour passé, hors périmètre visuel). "Aujourd'hui" ne casse ni ne prolonge tant que la soirée n'est pas explicitement complète (EXPERIENCE.md -- jamais un constat d'échec avant l'heure).
+- `data/streak.ts` (nouveau) : `getStreakForUser` -- lit les lignes réelles + reconstruit l'ensemble des jours scolaires sur la même plage en réutilisant `deriveDaySlots` (lecture seule, même fonction déjà consommée par EDT/Accueil) pour distinguer un jour scolaire manqué d'un jour sans cours (neutre, FR-13).
+- `domain/badges.ts` (nouveau, pur, testé) : paliers repris du mockup UX (`key-screens.html`, 3/7/14/30/60/100 jours -- non tranchés par le PRD, point de départ ajustable) ; débloqué = record personnel ≥ palier, **dérivé du vrai streak, aucune donnée inventée, aucune table Badge**.
+- `components/progression/streak-hero.tsx` + `components/progression/badge-grid.tsx` (nouveaux, présentationnels) : reprennent `.streak-hero`/`.badge-grid` du mockup UX. Affichés tels quels même à 0/tout verrouillé (EXPERIENCE.md -- pas de message spécial pour ce cas, un simple constat neutre).
+- `app/progression/page.tsx` : remplace la coquille vide, assemble les deux composants.
+- Vérifié : `next build`, `eslint`, 267 tests (dont `data/streak.test.ts`, intégration contre la vraie base), écran contrôlé visuellement à 0 (données seed réelles) ET avec un streak actif simulé temporairement puis nettoyé (Browser pane, desktop + mobile 375px).
 
 ## État Git
 
-Étapes 1-7 commitées localement (`git log` fera foi de l'état réel -- ne pas se fier à ce fichier pour le SHA le plus récent, seulement pour le contexte). Pas de push automatique sans demande explicite. Prochaine étape à reprendre : **étape 8** (page Progression), en attente d'un feu vert utilisateur.
+Étapes 1-8 commitées localement (`git log` fera foi de l'état réel -- ne pas se fier à ce fichier pour le SHA le plus récent, seulement pour le contexte). Pas de push automatique sans demande explicite. **Les 8 étapes du plan sont faites** -- prochaine session : revalidation générale par l'utilisateur, puis décider du push vers `origin/master`.
