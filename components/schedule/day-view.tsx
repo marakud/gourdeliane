@@ -1,5 +1,6 @@
-import { Check, NotebookPen } from "lucide-react";
+import { Check, NotebookPen, Sofa } from "lucide-react";
 import { SubjectTag } from "@/components/schedule/subject-tag";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 
 // Vue lecture seule d'un jour (Story 1.3, "Aujourd'hui"/"Demain") -- pas de
@@ -41,9 +42,13 @@ export function DayView({ slots, plannedDevoirs = [], emptyMessage }: DayViewPro
   return (
     <div className="flex flex-col gap-3">
       {slots.length === 0 ? (
-        <p className="rounded-2xl bg-card px-4 py-8 text-center text-base text-muted-foreground ring-1 ring-border">
-          {emptyMessage}
-        </p>
+        <div className="rounded-2xl bg-card px-4 py-8 ring-1 ring-border">
+          {/* Refonte visuelle étape 6 -- `Sofa` (journée libre, "profite de
+              ta journée/soirée") plutôt qu'une nouvelle icône par cas :
+              `emptyMessage` couvre déjà les deux (jour férié ou simplement
+              sans créneau saisi), même illustration pour les deux. */}
+          <EmptyState icon={Sofa} message={emptyMessage} />
+        </div>
       ) : (
         <ul className="flex flex-col gap-2">
           {slots.map((slot) => (

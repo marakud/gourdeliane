@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Pencil, Trash2 } from "lucide-react";
+import { Check, Pencil, Sparkles, Trash2 } from "lucide-react";
 import type { ActionResult } from "@/actions/homework";
 import { SubjectTag } from "@/components/schedule/subject-tag";
 import {
@@ -9,6 +9,7 @@ import {
   type HomeworkFormDialogSlot,
   type HomeworkFormDialogSubject,
 } from "@/components/homework/homework-form-dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import { cn } from "@/lib/utils";
 
 // Bloc "Devoirs" (Accueil, Story 2.4 -- retour utilisateur : contrairement à
@@ -187,9 +188,16 @@ export function DevoirsList({
       </div>
 
       {visibleDevoirs.length === 0 ? (
-        <p className="text-base text-muted-foreground">
-          Rien à faire ce soir, bravo !
-        </p>
+        // Refonte visuelle étape 6 -- `Sparkles`, même icône que
+        // CelebrationBadge (celebration-badge.tsx) : ce message est un vrai
+        // motif de satisfaction (EXPERIENCE.md), pas une simple absence de
+        // contenu -- même vocabulaire visuel que les autres "bonnes
+        // nouvelles" de l'app.
+        <EmptyState
+          icon={Sparkles}
+          message="Rien à faire ce soir, bravo !"
+          layout="inline"
+        />
       ) : (
         <ul className="flex flex-col gap-1.5">
           {visibleDevoirs.map((devoir) => {

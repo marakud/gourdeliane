@@ -68,7 +68,13 @@ Après chaque étape : fichiers modifiés annoncés, choix expliqués, responsiv
 - `app/layout.tsx` : export `viewport` avec `viewportFit: "cover"` -- requis pour que `env(safe-area-inset-bottom)` résolve une vraie valeur sur iPhone plutôt que 0.
 - Vérifié : `tsc`/`next build`, `eslint`, 251 tests, responsive desktop + mobile 375px (Browser pane).
 
-### Étape 6 -- États vides illustrés -- ⏳ pas commencée
+### Étape 6 -- États vides illustrés -- ✅ commit à venir
+
+- `components/ui/empty-state.tsx` (nouveau) : icône + message, deux mises en page (`stacked` centré / `inline` en ligne) -- pas de décor de carte propre (les appelants imbriqués dans une carte existante en ont déjà une).
+- Appliqué à 4 messages déjà existants (texte inchangé, EXPERIENCE.md) : `DayView` (EDT Aujourd'hui/Demain, icône `Sofa`), `WeekGrid` (EDT Semaine, `Sofa`), Sac sans cours demain (Accueil, `app/(accueil)/page.tsx`, `Sofa`), `DevoirsList` "Rien à faire ce soir, bravo !" (`Sparkles`, même icône que `CelebrationBadge`), `FixedChecklist` "Aucun item..." (`Settings`, même icône que le lien Réglages de la barre haute).
+- Hors périmètre volontairement : le message vide par groupe de `SacChecklist` ("Aucun objet défini pour cette matière", déjà sous une pastille de matière) et l'écran de gestion Réglages (`subject-items-manager.tsx`) -- pas le même public/ton que les écrans collégien.
+- **Bug préexistant corrigé en vérifiant cette étape** (pas introduit par la refonte) : le message vide de `WeekGrid` était invisible avant ce commit -- premier enfant `position: absolute` de la grille, entièrement recouvert par les colonnes de jours (`bg-card`, `position: relative`, plus tard dans le DOM, donc peintes par-dessus). `z-10` ajouté.
+- Vérifié : `next build`, `eslint`, 251 tests, les 4 états vides contrôlés visuellement (Browser pane) après le correctif.
 
 ### Étape 7 -- Emploi du temps -- ⏳ pas commencée
 
@@ -80,4 +86,4 @@ Actuellement une coquille vide (`app/progression/page.tsx`). Voir "Décisions ac
 
 ## État Git
 
-Étapes 1-5 commitées localement (`git log` fera foi de l'état réel -- ne pas se fier à ce fichier pour le SHA le plus récent, seulement pour le contexte). Pas de push automatique sans demande explicite. Prochaine étape à reprendre : **étape 6** (états vides illustrés), en attente d'un feu vert utilisateur.
+Étapes 1-6 commitées localement (`git log` fera foi de l'état réel -- ne pas se fier à ce fichier pour le SHA le plus récent, seulement pour le contexte). Pas de push automatique sans demande explicite. Prochaine étape à reprendre : **étape 7** (Emploi du temps), en attente d'un feu vert utilisateur.

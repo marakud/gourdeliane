@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check } from "lucide-react";
+import { Check, Settings } from "lucide-react";
 import type { ActionResult, ToggleChecklistItemInput } from "@/actions/checklist";
 import { CelebrationBadge } from "@/components/moment/celebration-badge";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useJustCompleted } from "@/lib/use-just-completed";
 import { useJustToggled } from "@/lib/use-just-toggled";
 import { cn } from "@/lib/utils";
@@ -163,9 +164,14 @@ export function FixedChecklist({
       />
 
       {total === 0 && (
-        <p className="text-sm text-muted-foreground">
-          Aucun item dans cette liste -- ajoutes-en depuis Réglages.
-        </p>
+        // Refonte visuelle étape 6 -- `Settings`, même icône que le lien
+        // Réglages de la barre haute (top-bar.tsx) : ce message pointe vers
+        // cet écran, réutilise directement son icône plutôt qu'une nouvelle.
+        <EmptyState
+          icon={Settings}
+          message="Aucun item dans cette liste -- ajoutes-en depuis Réglages."
+          layout="inline"
+        />
       )}
 
       <ul className="flex flex-col gap-1.5">

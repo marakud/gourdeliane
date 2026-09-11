@@ -1,8 +1,9 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Plus, Sofa } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SlotFormDialog } from "@/components/schedule/slot-form-dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   WEEKDAYS,
   WEEKDAY_LABELS,
@@ -77,9 +78,20 @@ export function WeekGrid({ slots, subjectNames }: WeekGridProps) {
       }}
     >
       {slots.length === 0 && (
-        <p className="pointer-events-none absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-sm text-muted-foreground">
-          Aucun créneau cette semaine.
-        </p>
+        // Refonte visuelle étape 6 -- même icône que DayView (Sofa, "rien de
+        // prévu") pour rester cohérent : c'est le même concept ("aucun
+        // créneau"), juste à l'échelle de la semaine plutôt que du jour.
+        // `z-10` (correctif découvert en vérifiant cette étape, préexistant
+        // à la refonte) : sans lui, ce message -- premier enfant de la grille
+        // en position absolute -- se retrouvait entièrement recouvert par
+        // les colonnes de jours (`bg-card`, `position: relative`, plus tard
+        // dans le DOM), invisible sauf sur la mince ligne de `gap-x-1` entre
+        // deux colonnes.
+        <EmptyState
+          icon={Sofa}
+          message="Aucun créneau cette semaine."
+          className="pointer-events-none absolute inset-x-0 top-1/2 z-10 -translate-y-1/2"
+        />
       )}
       <div />
       {WEEKDAYS.map((day) => (

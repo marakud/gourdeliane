@@ -1,3 +1,4 @@
+import { Sofa } from "lucide-react";
 import { connection } from "next/server";
 import { ensureSeedUser } from "@/data/user";
 import { getScheduleForUser } from "@/data/schedule";
@@ -57,6 +58,7 @@ import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
 import { GreetingCard } from "@/components/moment/greeting-card";
 import { MomentSoirCard } from "@/components/moment/moment-soir-card";
 import { MomentTabs } from "@/components/moment/moment-tabs";
+import { EmptyState } from "@/components/ui/empty-state";
 
 // Même technique que `formatFrenchDate`
 // (components/schedule/no-school-day-panel.tsx) : ancrage midi UTC pour
@@ -491,9 +493,14 @@ export default async function AccueilPage() {
                   <h3 className="font-heading text-base font-semibold text-foreground">
                     Avant d&apos;aller se coucher
                   </h3>
-                  <p className="text-base text-muted-foreground">
-                    Pas cours demain, profite de ta soirée !
-                  </p>
+                  {/* Refonte visuelle étape 6 -- même icône/famille que
+                      DayView (Sofa, "rien de prévu, profite") : même
+                      message canonique (EXPERIENCE.md), même illustration. */}
+                  <EmptyState
+                    icon={Sofa}
+                    message="Pas cours demain, profite de ta soirée !"
+                    layout="inline"
+                  />
                 </div>
               )}
             </div>
