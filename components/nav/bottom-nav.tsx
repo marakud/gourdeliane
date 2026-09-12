@@ -2,15 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, TrendingUp } from "lucide-react";
+import { Home, CalendarDays, ListChecks, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Navigation basse à 3 onglets (Accueil / Emploi du temps / Progression).
-// Coquille vide fonctionnelle pour Story 1.1 -- pas de logique métier ici,
-// juste des routes qui rendent un placeholder. Réglages est volontairement
-// absent de cette barre (accessible ailleurs, cf. app/reglages).
+// Navigation basse (Accueil / Mes tâches / Emploi du temps / Progression).
+// Réglages est volontairement absent de cette barre (accessible ailleurs,
+// cf. app/reglages). "Mes tâches" (évolution CartableFlow) juste après
+// Accueil : hub central des devoirs, aussi central au quotidien que
+// l'Accueil lui-même -- ListChecks plutôt qu'une nouvelle icône proche
+// (CalendarDays est déjà pris par l'EDT, éviter toute ambiguïté visuelle).
 const TABS = [
   { href: "/", label: "Accueil", fullLabel: "Accueil", icon: Home },
+  {
+    href: "/mes-taches",
+    label: "Tâches",
+    fullLabel: "Mes tâches",
+    icon: ListChecks,
+  },
   {
     href: "/edt",
     label: "EDT",

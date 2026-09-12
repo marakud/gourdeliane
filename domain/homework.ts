@@ -5,7 +5,7 @@
 // les dates "aujourd'hui" sont toujours reçues en `todayIso` explicite par
 // l'appelant (app/(accueil)/page.tsx, calculé via domain/school-day.ts).
 
-import type { Weekday } from "./schedule";
+import { WEEKDAY_LABELS, type Weekday } from "./schedule";
 
 // Évolution CartableFlow (modèle de tâches enrichi) -- statut à 3 valeurs,
 // coexiste avec `done` (AD-7) plutôt que de le remplacer : `done` reste la
@@ -88,6 +88,151 @@ export function computeEstimatedWorkload(
     0
   );
   return { totalMinutes, hasEstimate: remaining.length > 0 };
+}
+
+// Évolution CartableFlow -- page "Mes tâches" : 6 vues demandées
+// (Aujourd'hui/Demain/Cette semaine/Plus tard/En retard/Terminés). Un devoir
+// fait est toujours "DONE", quelle que soit son échéance (même un devoir en
+// retard mais fait n'est plus "en retard" -- Boundaries : "en retard" décrit
+// un travail non fait, pas un fait historique sur la date). Un devoir sans
+// échéance (`daysRemaining === null`) n'a sa place dans aucune des vues
+// datées (Aujourd'hui/Demain/Cette semaine/En retard exigent toutes une
+// date) -- rangé dans "Plus tard", la seule vue compatible avec "pas de date
+// précise".
+export const TASK_VIEW_TODAY = "TODAY" as const;
+export const TASK_VIEW_TOMORROW = "TOMORROW" as const;
+export const TASK_VIEW_THIS_WEEK = "THIS_WEEK" as const;
+export const TASK_VIEW_LATER = "LATER" as const;
+export const TASK_VIEW_OVERDUE = "OVERDUE" as const;
+export const TASK_VIEW_DONE = "DONE" as const;
+
+export type TaskViewCategory =
+  | typeof TASK_VIEW_TODAY
+  | typeof TASK_VIEW_TOMORROW
+  | typeof TASK_VIEW_THIS_WEEK
+  | typeof TASK_VIEW_LATER
+  | typeof TASK_VIEW_OVERDUE
+  | typeof TASK_VIEW_DONE;
+
+/** "Cette semaine" = fenêtre glissante de 7 jours (jours 2 à 7 après
+ * aujourd'hui, demain étant sa propre vue) -- pas la semaine calendaire ISO
+ * (aucune autre notion de semaine calendaire n'existe ailleurs dans l'app
+ * hors alternance A/B, sans rapport). Choix simple et prévisible, pas une
+ * règle produit figée. */
+const THIS_WEEK_MAX_DAYS_REMAINING = 7;
+
+/**
+ * Classe un devoir dans l'une des 6 vues, à partir de son statut fait/pas
+ * fait et du nombre de jours avant son échéance déjà calculé par
+ * `computeDaysRemaining` (`null` si aucune échéance) -- ne recalcule jamais
+ * une date lui-même (AD-1, todayIso reste la responsabilité de l'appelant).
+ */
+export function classifyTaskView(
+  done: boolean,
+  daysRemaining: number | null
+): TaskViewCategory {
+  if (done) return TASK_VIEW_DONE;
+  if (daysRemaining === null) return TASK_VIEW_LATER;
+  if (daysRemaining < 0) return TASK_VIEW_OVERDUE;
+  if (daysRemaining === 0) return TASK_VIEW_TODAY;
+  if (daysRemaining === 1) return TASK_VIEW_TOMORROW;
+  if (daysRemaining <= THIS_WEEK_MAX_DAYS_REMAINING) return TASK_VIEW_THIS_WEEK;
+  return TASK_VIEW_LATER;
+}
+
+/** Formate une échéance ISO "yyyy-MM-dd" en libellé court français (ex.
+ * "20 déc.") -- ancrée à midi UTC pour éviter tout décalage de fuseau à
+ * l'affichage, capitalisation manuelle de la seule première lettre (jamais
+ * la classe Tailwind `capitalize`, qui capitaliserait chaque mot -- bug
+ * corrigé en Story 1.3). Extraite de app/(accueil)/page.tsx (évolution
+ * CartableFlow, page "Mes tâches") pour rester une seule définition,
+ * partagée entre les deux écrans qui affichent une échéance. */
+export function formatEcheanceLabel(echeanceIso: string): string {
+  const date = new Date(`${echeanceIso}T12:00:00Z`);
+  const formatted = date.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "short",
+  });
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+}
+
+/** Devoir brut (déjà résolu par data/homework.ts::listDevoirs), échéance et
+ * placement EDT déjà réduits à des chaînes ISO/brutes par l'appelant --
+ * cette fonction ne touche jamais un objet `Date` (AD-1). */
+export interface DevoirTaskViewInput {
+  id: string;
+  description: string;
+  done: boolean;
+  aRendre: boolean;
+  status: DevoirStatus;
+  estimatedMinutes: number | null;
+  echeanceIso: string | null;
+  plannedWeekday: string | null;
+  plannedStartTime: string | null;
+  subject: { id: string; name: string; colorIndex: number };
+}
+
+/** Vue enrichie d'un devoir, prête à afficher -- même forme que
+ * `components/homework/devoirs-list.tsx::DevoirView`, plus `taskView`
+ * (classification pour la page "Mes tâches", inutile sur l'Accueil mais
+ * sans coût à calculer). */
+export interface DevoirTaskView {
+  id: string;
+  description: string;
+  done: boolean;
+  aRendre: boolean;
+  status: DevoirStatus;
+  estimatedMinutes: number | null;
+  subject: { id: string; name: string; colorIndex: number };
+  echeanceLabel: string | null;
+  daysRemaining: number | null;
+  echeanceIso: string | null;
+  planned: { weekday: string; startTime: string } | null;
+  plannedRaw: { weekday: string; startTime: string } | null;
+  taskView: TaskViewCategory;
+}
+
+/**
+ * Enrichit un devoir brut en vue prête à afficher -- échéance formatée,
+ * jours restants, placement EDT en libellé français, classification "Mes
+ * tâches". Fonction pure unique (AD-5) : jamais dupliquée entre
+ * app/(app)/(accueil)/page.tsx et app/(app)/mes-taches/page.tsx, qui
+ * affichent toutes deux des devoirs sous cette même forme.
+ */
+export function toDevoirTaskView(
+  devoir: DevoirTaskViewInput,
+  todayIso: string
+): DevoirTaskView {
+  const daysRemaining = devoir.echeanceIso
+    ? computeDaysRemaining(devoir.echeanceIso, todayIso)
+    : null;
+
+  return {
+    id: devoir.id,
+    description: devoir.description,
+    done: devoir.done,
+    aRendre: devoir.aRendre,
+    status: devoir.status,
+    estimatedMinutes: devoir.estimatedMinutes,
+    subject: devoir.subject,
+    echeanceLabel: devoir.echeanceIso
+      ? formatEcheanceLabel(devoir.echeanceIso)
+      : null,
+    daysRemaining,
+    echeanceIso: devoir.echeanceIso,
+    planned:
+      devoir.plannedWeekday && devoir.plannedStartTime
+        ? {
+            weekday: WEEKDAY_LABELS[devoir.plannedWeekday as Weekday],
+            startTime: devoir.plannedStartTime,
+          }
+        : null,
+    plannedRaw:
+      devoir.plannedWeekday && devoir.plannedStartTime
+        ? { weekday: devoir.plannedWeekday, startTime: devoir.plannedStartTime }
+        : null,
+    taskView: classifyTaskView(devoir.done, daysRemaining),
+  };
 }
 
 /** Formate une durée en minutes pour l'affichage ("30 min", "1 h", "1 h 10")

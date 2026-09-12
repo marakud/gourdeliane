@@ -61,6 +61,14 @@ function revalidateEdt() {
   safeRevalidate("/edt");
 }
 
+function revalidateMesTaches() {
+  // Évolution CartableFlow -- page "Mes tâches" (étape 3) affiche tous les
+  // devoirs, pas seulement ceux d'Accueil/EDT -- une mutation faite depuis
+  // n'importe quel écran (Accueil, EDT, ou cette page elle-même) doit aussi
+  // la revalider.
+  safeRevalidate("/mes-taches");
+}
+
 // Story 2.7 -- même raisonnement que `safeRevalidate` ci-dessus : le
 // recalcul/persistance de la complétude "Ce soir" (AD-5) est un
 // enregistrement de bord (le futur Streak, Epic 4, pas encore construit) qui
@@ -240,6 +248,7 @@ export async function createDevoirAction(
     );
     revalidateAccueil();
     revalidateEdt();
+    revalidateMesTaches();
     return { ok: true, data: { id: devoir.id } };
   } catch (error) {
     console.error("createDevoirAction failed:", error);
@@ -280,6 +289,7 @@ export async function updateDevoirAction(
     );
     revalidateAccueil();
     revalidateEdt();
+    revalidateMesTaches();
     return { ok: true, data: { id: devoir.id } };
   } catch (error) {
     console.error("updateDevoirAction failed:", error);
@@ -310,6 +320,7 @@ export async function toggleDevoirDoneAction(
     await toggleDevoirDone(input.id, userId, input.done);
     revalidateAccueil();
     revalidateEdt();
+    revalidateMesTaches();
     // Story 2.7 (AD-5) -- un devoir "à rendre" échéant demain fait partie de
     // la complétude du moment "Ce soir" ; recalculée après chaque bascule
     // fait/pas fait, même si ce devoir précis ne s'avère pas concerné (le
@@ -351,6 +362,7 @@ export async function startDevoirAction(
     const result = await startDevoir(input.id, userId);
     revalidateAccueil();
     revalidateEdt();
+    revalidateMesTaches();
     return { ok: true, data: result };
   } catch (error) {
     console.error("startDevoirAction failed:", error);
@@ -381,6 +393,7 @@ export async function deleteDevoirAction(
     await deleteDevoir(input.id, userId);
     revalidateAccueil();
     revalidateEdt();
+    revalidateMesTaches();
     return { ok: true, data: null };
   } catch (error) {
     console.error("deleteDevoirAction failed:", error);

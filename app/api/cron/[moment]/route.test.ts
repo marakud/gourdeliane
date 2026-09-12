@@ -33,6 +33,14 @@ function params(moment: string) {
 }
 
 beforeEach(() => {
+  // La route dérive "aujourd'hui" de l'horloge système réelle (`new Date()`,
+  // route.ts) -- `shouldSkipReminderToday` (domain/notifications.ts) saute
+  // TOUJOURS samedi/dimanche, quel que soit le mock NoSchoolDay. Sans figer
+  // l'horloge, ces tests devenaient flaky un vrai samedi/dimanche (constaté
+  // le 2026-09-12, un samedi : sent/skippedNoSchool inversés). On fixe un
+  // lundi, loin de toute frontière de fuseau (midi Guadeloupe = 16h UTC).
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2026-09-14T16:00:00.000Z"));
   vi.stubEnv("CRON_SECRET", "test-secret");
   findManyMock.mockResolvedValue([{ id: "user-1" }]);
   getScheduleForUserMock.mockResolvedValue({ noSchoolDays: [] });
@@ -40,6 +48,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.resetAllMocks();
   vi.resetModules();

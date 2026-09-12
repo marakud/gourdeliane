@@ -1,31 +1,28 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Check, Pencil, Play, Sparkles, Trash2 } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import type { ActionResult } from "@/actions/homework";
-import { SubjectTag } from "@/components/schedule/subject-tag";
-import {
-  HomeworkFormDialog,
-  type HomeworkFormDialogSlot,
-  type HomeworkFormDialogSubject,
+import { DevoirRow } from "@/components/homework/devoir-row";
+import type {
+  HomeworkFormDialogSlot,
+  HomeworkFormDialogSubject,
 } from "@/components/homework/homework-form-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useDevoirActions } from "@/lib/use-devoir-actions";
 import {
   computeEstimatedWorkload,
   formatEstimatedDuration,
-  DEVOIR_STATUS_DONE,
-  DEVOIR_STATUS_IN_PROGRESS,
-  DEVOIR_STATUS_TODO,
   type DevoirStatus,
+  type TaskViewCategory,
 } from "@/domain/homework";
-import { cn } from "@/lib/utils";
 
 // Bloc "Devoirs" (Accueil, Story 2.4 -- retour utilisateur : contrairement à
 // la première itération, un devoir coché reste affiché (coché), jamais
-// retiré de la liste. Bascule bidirectionnelle et suppression explicite,
-// même mécanique de mise à jour optimiste que `FixedChecklist`
-// (components/checklist/fixed-checklist.tsx), avec un bouton supprimer
-// séparé (icône, mirror `SlotRow` -- components/schedule/slot-row.tsx).
+// retiré de la liste. Bascule bidirectionnelle et suppression explicite.
+// État/handlers extraits dans lib/use-devoir-actions.ts, rendu d'une ligne
+// extrait dans components/homework/devoir-row.tsx (évolution CartableFlow,
+// page "Mes tâches") -- partagés entre ce bloc et cette nouvelle page,
+// jamais dupliqués.
 
 export interface DevoirView {
   id: string;
@@ -48,6 +45,10 @@ export interface DevoirView {
   // nécessaire pour réinitialiser le FreeTimePicker en édition.
   planned: { weekday: string; startTime: string } | null;
   plannedRaw: { weekday: string; startTime: string } | null;
+  // Classification pour la page "Mes tâches" (domain/homework.ts::classifyTaskView)
+  // -- inutile pour ce bloc (Accueil ne filtre pas par vue), calculée quand
+  // même par `toDevoirTaskView` en amont, sans coût à porter ici.
+  taskView: TaskViewCategory;
 }
 
 export type ToggleDevoirDoneAction = (input: {
@@ -74,26 +75,6 @@ export interface DevoirsListProps {
   scheduleSlots?: HomeworkFormDialogSlot[];
 }
 
-function daysRemainingLabel(daysRemaining: number): string {
-  if (daysRemaining === 0) return "aujourd'hui";
-  if (daysRemaining === 1) return "demain";
-  if (daysRemaining === -1) return "hier";
-  if (daysRemaining > 1) return `dans ${daysRemaining} jours`;
-  return `il y a ${Math.abs(daysRemaining)} jours`;
-}
-
-function doneMapFrom(devoirs: readonly { id: string; done: boolean }[]) {
-  const map: Record<string, boolean> = {};
-  for (const devoir of devoirs) map[devoir.id] = devoir.done;
-  return map;
-}
-
-function statusMapFrom(devoirs: readonly { id: string; status: DevoirStatus }[]) {
-  const map: Record<string, DevoirStatus> = {};
-  for (const devoir of devoirs) map[devoir.id] = devoir.status;
-  return map;
-}
-
 export function DevoirsList({
   devoirs,
   onToggle,
@@ -102,140 +83,18 @@ export function DevoirsList({
   subjects,
   scheduleSlots = [],
 }: DevoirsListProps) {
-  // État coché en cours d'édition optimiste -- clé par id, initialisé depuis
-  // les props puis mis à jour localement au tap, avant la réponse serveur.
-  const [doneById, setDoneById] = useState<Record<string, boolean>>(() =>
-    doneMapFrom(devoirs)
-  );
-  // Même principe pour le statut (évolution CartableFlow, bouton
-  // "Commencer") -- optimiste, resynchronisé avec `doneById` ci-dessous.
-  const [statusById, setStatusById] = useState<Record<string, DevoirStatus>>(
-    () => statusMapFrom(devoirs)
-  );
-  // Reseynchronise depuis les props à chaque nouvelle donnée serveur (ex.
-  // après une revalidation déclenchée ailleurs) -- sans ceci, une valeur
-  // optimiste locale pourrait diverger indéfiniment de l'état réel une fois
-  // le composant monté (la bascule est désormais bidirectionnelle,
-  // contrairement à la première itération où un devoir coché disparaissait
-  // du rendu et ne posait donc jamais cette question). Ajustement pendant le
-  // rendu plutôt qu'un `useEffect` (pattern React recommandé pour dériver un
-  // état depuis des props qui changent -- évite un aller-retour de rendu
-  // supplémentaire).
-  const [prevDevoirs, setPrevDevoirs] = useState(devoirs);
-  if (devoirs !== prevDevoirs) {
-    setPrevDevoirs(devoirs);
-    setDoneById(doneMapFrom(devoirs));
-    setStatusById(statusMapFrom(devoirs));
-  }
-  // Ids supprimés optimistiquement -- masqués du rendu même si la réponse
-  // serveur n'est pas encore revenue.
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(() => new Set());
-  const [errorIds, setErrorIds] = useState<Set<string>>(() => new Set());
-  // ids en cours d'enregistrement -- empêche un double-tap concurrent sur la
-  // même ligne pendant l'aller-retour serveur, par ligne (Set, pas un seul
-  // id) : plusieurs lignes peuvent désormais être éditées en parallèle
-  // puisqu'aucune ne disparaît plus du rendu au tap.
-  const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set());
-  const [, startTransition] = useTransition();
+  const {
+    visibleDevoirs,
+    pendingIds,
+    errorIds,
+    handleToggle,
+    handleStart,
+    handleDelete,
+    setPending,
+  } = useDevoirActions(devoirs, onToggle, onStart, onDelete);
 
-  function clearError(id: string) {
-    setErrorIds((prev) => {
-      if (!prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  }
-
-  function addError(id: string) {
-    setErrorIds((prev) => new Set(prev).add(id));
-  }
-
-  function setPending(id: string, pending: boolean) {
-    setPendingIds((prev) => {
-      const next = new Set(prev);
-      if (pending) next.add(id);
-      else next.delete(id);
-      return next;
-    });
-  }
-
-  function handleToggle(id: string) {
-    if (pendingIds.has(id)) return;
-
-    const next = !doneById[id];
-    const prevStatus = statusById[id];
-    clearError(id);
-    setPending(id, true);
-    setDoneById((prev) => ({ ...prev, [id]: next }));
-    // `status` reste synchronisé avec `done` (même règle que
-    // data/homework.ts::toggleDevoirDone -- coché -> DONE, décoché -> TODO).
-    setStatusById((prev) => ({
-      ...prev,
-      [id]: next ? DEVOIR_STATUS_DONE : DEVOIR_STATUS_TODO,
-    }));
-
-    startTransition(async () => {
-      const result = await onToggle({ id, done: next });
-      if (!result.ok) {
-        setDoneById((prev) => ({ ...prev, [id]: !next }));
-        setStatusById((prev) => ({ ...prev, [id]: prevStatus }));
-        addError(id);
-      }
-      setPending(id, false);
-    });
-  }
-
-  function handleStart(id: string) {
-    if (pendingIds.has(id)) return;
-    if (statusById[id] !== DEVOIR_STATUS_TODO) return;
-
-    clearError(id);
-    setPending(id, true);
-    setStatusById((prev) => ({ ...prev, [id]: DEVOIR_STATUS_IN_PROGRESS }));
-
-    startTransition(async () => {
-      const result = await onStart({ id });
-      if (!result.ok) {
-        setStatusById((prev) => ({ ...prev, [id]: DEVOIR_STATUS_TODO }));
-        addError(id);
-      }
-      setPending(id, false);
-    });
-  }
-
-  function handleDelete(id: string) {
-    if (pendingIds.has(id)) return;
-
-    clearError(id);
-    setPending(id, true);
-    setDeletedIds((prev) => new Set(prev).add(id));
-
-    startTransition(async () => {
-      const result = await onDelete({ id });
-      if (!result.ok) {
-        setDeletedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        addError(id);
-      }
-      setPending(id, false);
-    });
-  }
-
-  const visibleDevoirs = devoirs.filter((devoir) => !deletedIds.has(devoir.id));
-  const doneCount = visibleDevoirs.filter((devoir) => doneById[devoir.id]).length;
-  // Charge estimée -- reflète l'état optimiste (doneById), pas devoir.done
-  // brut, pour que cocher/décocher mette à jour le total sans attendre la
-  // réponse serveur (comme le reste de cette liste).
-  const workload = computeEstimatedWorkload(
-    visibleDevoirs.map((devoir) => ({
-      done: doneById[devoir.id] ?? devoir.done,
-      estimatedMinutes: devoir.estimatedMinutes,
-    }))
-  );
+  const doneCount = visibleDevoirs.filter((devoir) => devoir.done).length;
+  const workload = computeEstimatedWorkload(visibleDevoirs);
 
   return (
     <div className="flex flex-col gap-4">
@@ -274,128 +133,20 @@ export function DevoirsList({
         />
       ) : (
         <ul className="flex flex-col gap-1.5">
-          {visibleDevoirs.map((devoir) => {
-            const checked = doneById[devoir.id] ?? devoir.done;
-            const status = statusById[devoir.id] ?? devoir.status;
-            const inProgress = status === DEVOIR_STATUS_IN_PROGRESS && !checked;
-            return (
-              <li key={devoir.id} className="flex flex-col gap-1.5">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleToggle(devoir.id)}
-                    aria-pressed={checked}
-                    disabled={pendingIds.has(devoir.id)}
-                    className="flex min-h-[44px] min-w-0 flex-1 items-center gap-3 rounded-xl bg-muted px-3 py-2 text-left disabled:opacity-60"
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={cn(
-                        "flex size-6 shrink-0 items-center justify-center rounded-full ring-2 transition-colors",
-                        checked
-                          ? "bg-success ring-success"
-                          : "bg-transparent ring-neutral-pending"
-                      )}
-                    >
-                      {checked && (
-                        <Check className="size-4 text-success-foreground" />
-                      )}
-                    </span>
-                    <SubjectTag
-                      name={devoir.subject.name}
-                      colorIndex={devoir.subject.colorIndex}
-                    />
-                    <div className="flex min-w-0 flex-1 flex-col">
-                      <span
-                        className={cn(
-                          "truncate text-base",
-                          checked
-                            ? "text-muted-foreground line-through"
-                            : "text-foreground"
-                        )}
-                      >
-                        {devoir.description}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {devoir.subject.name}
-                        {devoir.estimatedMinutes !== null && (
-                          <> · Prévu : {formatEstimatedDuration(devoir.estimatedMinutes)}</>
-                        )}
-                        {devoir.echeanceLabel && devoir.daysRemaining !== null && (
-                          <> · Échéance : {devoir.echeanceLabel} ({daysRemainingLabel(devoir.daysRemaining)})</>
-                        )}
-                        {devoir.planned && (
-                          <>
-                            {" "}
-                            · {devoir.planned.weekday} {devoir.planned.startTime}
-                          </>
-                        )}
-                        {inProgress && (
-                          <>
-                            {" "}
-                            · <span className="font-semibold text-primary">En cours</span>
-                          </>
-                        )}
-                      </span>
-                    </div>
-                  </button>
-                  {!checked && status === DEVOIR_STATUS_TODO && (
-                    <button
-                      type="button"
-                      onClick={() => handleStart(devoir.id)}
-                      disabled={pendingIds.has(devoir.id)}
-                      aria-label={`Commencer ${devoir.description}`}
-                      className="flex size-11 shrink-0 items-center justify-center rounded-xl text-primary disabled:opacity-60"
-                    >
-                      <Play aria-hidden="true" className="size-4" />
-                    </button>
-                  )}
-                  <HomeworkFormDialog
-                    trigger={
-                      <button
-                        type="button"
-                        disabled={pendingIds.has(devoir.id)}
-                        aria-label={`Modifier ${devoir.description}`}
-                        className="flex size-11 shrink-0 items-center justify-center rounded-xl text-muted-foreground disabled:opacity-60"
-                      >
-                        <Pencil aria-hidden="true" className="size-4" />
-                      </button>
-                    }
-                    subjects={subjects}
-                    scheduleSlots={scheduleSlots}
-                    onPendingChange={(pending) => setPending(devoir.id, pending)}
-                    devoir={{
-                      id: devoir.id,
-                      subjectId: devoir.subject.id,
-                      description: devoir.description,
-                      aRendre: devoir.aRendre,
-                      echeance: devoir.echeanceIso ?? "",
-                      plannedWeekday: devoir.plannedRaw?.weekday ?? "",
-                      plannedStartTime: devoir.plannedRaw?.startTime ?? "",
-                      estimatedMinutes: devoir.estimatedMinutes,
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(devoir.id)}
-                    disabled={pendingIds.has(devoir.id)}
-                    aria-label={`Supprimer ${devoir.description}`}
-                    className="flex size-11 shrink-0 items-center justify-center rounded-xl text-destructive disabled:opacity-60"
-                  >
-                    <Trash2 aria-hidden="true" className="size-4" />
-                  </button>
-                </div>
-                {errorIds.has(devoir.id) && (
-                  <p
-                    role="alert"
-                    className="pl-1 text-sm font-medium text-destructive"
-                  >
-                    Impossible d&apos;enregistrer. Réessaie.
-                  </p>
-                )}
-              </li>
-            );
-          })}
+          {visibleDevoirs.map((devoir) => (
+            <DevoirRow
+              key={devoir.id}
+              devoir={devoir}
+              pending={pendingIds.has(devoir.id)}
+              hasError={errorIds.has(devoir.id)}
+              onToggle={() => handleToggle(devoir.id)}
+              onStart={() => handleStart(devoir.id)}
+              onDelete={() => handleDelete(devoir.id)}
+              onPendingChange={(pending) => setPending(devoir.id, pending)}
+              subjects={subjects}
+              scheduleSlots={scheduleSlots}
+            />
+          ))}
         </ul>
       )}
     </div>

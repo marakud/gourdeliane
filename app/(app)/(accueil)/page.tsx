@@ -12,7 +12,6 @@ import {
   computeWeekParity,
   dedupeSubjectsFromSlots,
   deriveDaySlots,
-  WEEKDAY_LABELS,
   type WeekParity,
   type Weekday,
 } from "@/domain/schedule";
@@ -37,7 +36,7 @@ import {
   partitionDevoirsARendreForSac,
   type ChecklistSubjectGroupInput,
 } from "@/domain/checklist";
-import { computeDaysRemaining } from "@/domain/homework";
+import { toDevoirTaskView } from "@/domain/homework";
 import {
   computeSoirCompletion,
   countBlockProgress,
@@ -64,20 +63,6 @@ import { GreetingCard } from "@/components/moment/greeting-card";
 import { MomentSoirCard } from "@/components/moment/moment-soir-card";
 import { MomentTabs } from "@/components/moment/moment-tabs";
 import { EmptyState } from "@/components/ui/empty-state";
-
-// Même technique que `formatFrenchDate`
-// (components/schedule/no-school-day-panel.tsx) : ancrage midi UTC pour
-// éviter tout décalage de fuseau à l'affichage, et capitalisation manuelle de
-// la seule première lettre (jamais la classe Tailwind `capitalize`, qui
-// capitaliserait chaque mot -- bug corrigé en Story 1.3).
-function formatEcheanceLabel(echeanceIso: string): string {
-  const date = new Date(`${echeanceIso}T12:00:00Z`);
-  const formatted = date.toLocaleDateString("fr-FR", {
-    day: "numeric",
-    month: "short",
-  });
-  return formatted.charAt(0).toUpperCase() + formatted.slice(1);
-}
 
 /**
  * Date + heure du message d'accueil, en America/Guadeloupe fixe (AD-4) --
@@ -321,40 +306,29 @@ export default async function AccueilPage() {
   // jamais retiré de la liste par un filtre (Boundaries spec 2.4 amendée).
   // Échéance/jours-restants formatés ici, côté serveur (AD-4) -- jamais
   // recalculés côté client. `devoirs` déjà chargé plus haut (Story 2.5).
-  const devoirsView = devoirs.map((devoir) => {
-    const echeanceIso = devoir.echeance
-      ? devoir.echeance.toISOString().slice(0, 10)
-      : null;
-    return {
-      id: devoir.id,
-      description: devoir.description,
-      done: devoir.done,
-      aRendre: devoir.aRendre,
-      status: devoir.status as DevoirStatus,
-      estimatedMinutes: devoir.estimatedMinutes,
-      subject: {
-        id: devoir.subject.id,
-        name: devoir.subject.name,
-        colorIndex: devoir.subject.colorIndex,
+  const devoirsView = devoirs.map((devoir) =>
+    toDevoirTaskView(
+      {
+        id: devoir.id,
+        description: devoir.description,
+        done: devoir.done,
+        aRendre: devoir.aRendre,
+        status: devoir.status as DevoirStatus,
+        estimatedMinutes: devoir.estimatedMinutes,
+        echeanceIso: devoir.echeance
+          ? devoir.echeance.toISOString().slice(0, 10)
+          : null,
+        plannedWeekday: devoir.plannedWeekday,
+        plannedStartTime: devoir.plannedStartTime,
+        subject: {
+          id: devoir.subject.id,
+          name: devoir.subject.name,
+          colorIndex: devoir.subject.colorIndex,
+        },
       },
-      echeanceLabel: echeanceIso ? formatEcheanceLabel(echeanceIso) : null,
-      daysRemaining: echeanceIso
-        ? computeDaysRemaining(echeanceIso, todayIso)
-        : null,
-      echeanceIso,
-      planned:
-        devoir.plannedWeekday && devoir.plannedStartTime
-          ? {
-              weekday: WEEKDAY_LABELS[devoir.plannedWeekday as Weekday],
-              startTime: devoir.plannedStartTime,
-            }
-          : null,
-      plannedRaw:
-        devoir.plannedWeekday && devoir.plannedStartTime
-          ? { weekday: devoir.plannedWeekday, startTime: devoir.plannedStartTime }
-          : null,
-    };
-  });
+      todayIso
+    )
+  );
 
   const homeworkSubjects = subjects.map((subject) => ({
     id: subject.id,

@@ -1,9 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  classifyTaskView,
   computeDaysRemaining,
   computeEstimatedWorkload,
   filterDevoirsForWeekday,
   formatEstimatedDuration,
+  TASK_VIEW_DONE,
+  TASK_VIEW_LATER,
+  TASK_VIEW_OVERDUE,
+  TASK_VIEW_THIS_WEEK,
+  TASK_VIEW_TODAY,
+  TASK_VIEW_TOMORROW,
 } from "./homework";
 
 describe("computeDaysRemaining (spec 2.4 amendment I/O matrix)", () => {
@@ -168,5 +175,41 @@ describe("formatEstimatedDuration (évolution CartableFlow)", () => {
   it("formats hours with a remainder as 'X h YY'", () => {
     expect(formatEstimatedDuration(70)).toBe("1 h 10");
     expect(formatEstimatedDuration(125)).toBe("2 h 05");
+  });
+});
+
+describe("classifyTaskView (évolution CartableFlow -- page Mes tâches)", () => {
+  it("classifies a done devoir as DONE regardless of its échéance", () => {
+    expect(classifyTaskView(true, -5)).toBe(TASK_VIEW_DONE);
+    expect(classifyTaskView(true, 0)).toBe(TASK_VIEW_DONE);
+    expect(classifyTaskView(true, null)).toBe(TASK_VIEW_DONE);
+  });
+
+  it("classifies a not-done devoir with no échéance as LATER", () => {
+    expect(classifyTaskView(false, null)).toBe(TASK_VIEW_LATER);
+  });
+
+  it("classifies a negative daysRemaining as OVERDUE", () => {
+    expect(classifyTaskView(false, -1)).toBe(TASK_VIEW_OVERDUE);
+    expect(classifyTaskView(false, -30)).toBe(TASK_VIEW_OVERDUE);
+  });
+
+  it("classifies daysRemaining=0 as TODAY", () => {
+    expect(classifyTaskView(false, 0)).toBe(TASK_VIEW_TODAY);
+  });
+
+  it("classifies daysRemaining=1 as TOMORROW", () => {
+    expect(classifyTaskView(false, 1)).toBe(TASK_VIEW_TOMORROW);
+  });
+
+  it("classifies daysRemaining=2..7 as THIS_WEEK", () => {
+    for (const daysRemaining of [2, 3, 4, 5, 6, 7]) {
+      expect(classifyTaskView(false, daysRemaining)).toBe(TASK_VIEW_THIS_WEEK);
+    }
+  });
+
+  it("classifies daysRemaining>7 as LATER", () => {
+    expect(classifyTaskView(false, 8)).toBe(TASK_VIEW_LATER);
+    expect(classifyTaskView(false, 100)).toBe(TASK_VIEW_LATER);
   });
 });
