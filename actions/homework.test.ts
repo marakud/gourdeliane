@@ -1,79 +1,55 @@
 import "dotenv/config";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "../data/prisma";
-import { ensureSeedUser } from "../data/user";
 import {
   createDevoirAction,
   deleteDevoirAction,
   toggleDevoirDoneAction,
   updateDevoirAction,
 } from "./homework";
-import { DAY_COMPLETION_MOMENT_SOIR } from "../domain/day-completion";
-import { getTodaySchoolDate, schoolDateToIso } from "../domain/school-day";
 
 // Tests d'intégration contre la vraie base de dev (SQLite). Comme
-// actions/checklist.test.ts, ces actions appellent en interne
-// `ensureSeedUser()` -- pas de userId synthétique possible, elles agissent
-// toujours sur l'utilisateur unique réel de l'app. Le nettoyage se fait donc
-// par `description` (distinctive à chaque test) plutôt que par userId.
+// actions/checklist.test.ts, ces actions résolvent l'utilisateur depuis la
+// session (`requireUserId`, lib/current-user.ts) -- mocké ici vers un
+// utilisateur de test synthétique, jamais le vrai utilisateur unique d'avant
+// l'authentification. `onDelete: Cascade` (User -> Subject -> Devoir, User ->
+// DayCompletion) nettoie tout en supprimant l'utilisateur de test en
+// `afterAll`, pas besoin de cibler chaque devoir par `description`
+// individuellement -- gardé quand même pour lister explicitement ce que
+// cette suite écrit.
 //
 // `revalidatePath` lève hors d'une requête Next.js (avalé par
 // `safeRevalidate`) -- ces actions restent testables directement ici sans
 // serveur Next.js démarré.
 
-const TEST_DESCRIPTIONS = [
-  "action-test-devoir-minimal",
-  "action-test-devoir-complet",
-  "action-test-devoir-toggle",
-  "action-test-devoir-untoggle",
-  "action-test-devoir-bad-echeance",
-  "action-test-devoir-invalid-calendar-date",
-  "action-test-devoir-planned",
-  "action-test-devoir-partial-plan-day",
-  "action-test-devoir-partial-plan-time",
-  "action-test-devoir-bad-weekday",
-  "action-test-devoir-bad-time",
-  "action-test-devoir-delete",
-  "action-test-devoir-update-before",
-  "action-test-devoir-update-after",
-  "action-test-devoir-update-done-preserved",
-  "action-test-devoir-update-done-preserved (modifié)",
-  "action-test-devoir-update-bad",
-  "action-test-devoir-update-empty-id",
-];
+const TEST_USER_ID = "test-user-actions-homework";
+
+vi.mock("@/lib/current-user", () => ({
+  requireUserId: async () => TEST_USER_ID,
+}));
+
+beforeAll(async () => {
+  await prisma.user.upsert({
+    where: { id: TEST_USER_ID },
+    update: {},
+    create: { id: TEST_USER_ID },
+  });
+});
 
 let subjectId: string;
 
 async function ensureTestSubject() {
-  const user = await ensureSeedUser();
   const subject = await prisma.subject.create({
-    data: { userId: user.id, name: `action-test-subject-${Date.now()}`, colorIndex: 1 },
+    data: { userId: TEST_USER_ID, name: `action-test-subject-${Date.now()}`, colorIndex: 1 },
   });
   subjectId = subject.id;
   return subject;
 }
 
 afterAll(async () => {
-  await prisma.devoir.deleteMany({
-    where: { description: { in: TEST_DESCRIPTIONS } },
-  });
-  if (subjectId) {
-    await prisma.subject.delete({ where: { id: subjectId } }).catch(() => {});
-  }
-  // Story 2.7 -- `toggleDevoirDoneAction` appelle désormais
-  // `recomputeAndPersistSoirCompletion` sur le VRAI utilisateur avec
-  // `new Date()` -- même nettoyage que actions/checklist.test.ts, pour ne
-  // pas laisser une ligne DayCompletion s'accumuler sur la vraie base de dev
-  // à chaque exécution de la suite (correctif de revue).
-  const user = await ensureSeedUser();
-  const todayIso = schoolDateToIso(getTodaySchoolDate(new Date()));
-  await prisma.dayCompletion.deleteMany({
-    where: {
-      userId: user.id,
-      date: new Date(`${todayIso}T00:00:00.000Z`),
-      moment: DAY_COMPLETION_MOMENT_SOIR,
-    },
-  });
+  // `onDelete: Cascade` (User -> Subject -> Devoir, User -> DayCompletion)
+  // nettoie tout en un coup -- même convention que actions/checklist.test.ts.
+  await prisma.user.delete({ where: { id: TEST_USER_ID } });
   await prisma.$disconnect();
 });
 

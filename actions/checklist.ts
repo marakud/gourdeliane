@@ -11,7 +11,7 @@ import {
   CHECKLIST_TYPE_REVISIONS,
   CHECKLIST_TYPE_SAC,
 } from "@/domain/checklist";
-import { ensureSeedUser } from "@/data/user";
+import { requireUserId } from "@/lib/current-user";
 import {
   createFixedChecklistItem as createFixedChecklistItemData,
   createSubjectItem as createSubjectItemData,
@@ -134,9 +134,9 @@ export async function toggleChecklistItem(
   const resolvedChecklistType = input.checklistType ?? CHECKLIST_TYPE_SAC;
 
   try {
-    const user = await ensureSeedUser();
+    const userId = await requireUserId();
     await upsertChecklistItemState({
-      userId: user.id,
+      userId,
       date,
       checklistType: resolvedChecklistType,
       sourceType: input.sourceType ?? CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
@@ -154,7 +154,7 @@ export async function toggleChecklistItem(
       resolvedChecklistType === CHECKLIST_TYPE_SAC ||
       resolvedChecklistType === CHECKLIST_TYPE_REVISIONS
     ) {
-      await safeRecomputeSoirCompletion(user.id);
+      await safeRecomputeSoirCompletion(userId);
     }
     return { ok: true, data: null };
   } catch (error) {
@@ -183,8 +183,8 @@ export async function createSubjectItem(
   }
 
   try {
-    const user = await ensureSeedUser();
-    const item = await createSubjectItemData(user.id, input.subjectId, label);
+    const userId = await requireUserId();
+    const item = await createSubjectItemData(userId, input.subjectId, label);
     revalidateReglages();
     revalidateAccueil();
     return { ok: true, data: { id: item.id } };
@@ -204,8 +204,8 @@ export async function updateSubjectItem(
   }
 
   try {
-    const user = await ensureSeedUser();
-    const item = await updateSubjectItemData(id, user.id, trimmed);
+    const userId = await requireUserId();
+    const item = await updateSubjectItemData(id, userId, trimmed);
     revalidateReglages();
     revalidateAccueil();
     return { ok: true, data: { id: item.id } };
@@ -219,8 +219,8 @@ export async function deleteSubjectItem(
   id: string
 ): Promise<ActionResult<null>> {
   try {
-    const user = await ensureSeedUser();
-    await deleteSubjectItemData(id, user.id);
+    const userId = await requireUserId();
+    await deleteSubjectItemData(id, userId);
     revalidateReglages();
     revalidateAccueil();
     return { ok: true, data: null };
@@ -252,9 +252,9 @@ export async function createFixedChecklistItem(
   }
 
   try {
-    const user = await ensureSeedUser();
+    const userId = await requireUserId();
     const item = await createFixedChecklistItemData(
-      user.id,
+      userId,
       CHECKLIST_TYPE_MATIN,
       label
     );
@@ -277,8 +277,8 @@ export async function updateFixedChecklistItem(
   }
 
   try {
-    const user = await ensureSeedUser();
-    const item = await updateFixedChecklistItemData(id, user.id, trimmed);
+    const userId = await requireUserId();
+    const item = await updateFixedChecklistItemData(id, userId, trimmed);
     revalidateReglages();
     revalidateAccueil();
     return { ok: true, data: { id: item.id } };
@@ -292,8 +292,8 @@ export async function deleteFixedChecklistItem(
   id: string
 ): Promise<ActionResult<null>> {
   try {
-    const user = await ensureSeedUser();
-    await deleteFixedChecklistItemData(id, user.id);
+    const userId = await requireUserId();
+    await deleteFixedChecklistItemData(id, userId);
     revalidateReglages();
     revalidateAccueil();
     return { ok: true, data: null };
@@ -338,9 +338,9 @@ export async function createRetourChecklistItem(
   }
 
   try {
-    const user = await ensureSeedUser();
+    const userId = await requireUserId();
     const item = await createFixedChecklistItemData(
-      user.id,
+      userId,
       CHECKLIST_TYPE_RETOUR,
       label
     );

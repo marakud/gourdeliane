@@ -1,16 +1,17 @@
 import { NextRequest } from "next/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getTodaySchoolDate, schoolDateToIso } from "@/domain/school-day";
 
 // Premier test de Route Handler du repo -- pas de convention établie
 // (cf. actions/*.test.ts pour les Server Actions). Toutes les dépendances
 // data/lib sont mockées : ce test vérifie le contrat HTTP de la route
-// (401/400/200, ordre auth-avant-validation, skip) -- pas la persistance
-// réelle, déjà couverte par lib/push.test.ts et les vérifications manuelles
-// consignées dans la spec 3.1.
+// (401/400/200, ordre auth-avant-validation, skip, isolation multi-famille)
+// -- pas la persistance réelle, déjà couverte par lib/push.test.ts et les
+// vérifications manuelles consignées dans la spec 3.1.
 
-const ensureSeedUserMock = vi.fn();
-vi.mock("@/data/user", () => ({
-  ensureSeedUser: (...args: unknown[]) => ensureSeedUserMock(...args),
+const findManyMock = vi.fn();
+vi.mock("@/data/prisma", () => ({
+  prisma: { user: { findMany: (...args: unknown[]) => findManyMock(...args) } },
 }));
 
 const getScheduleForUserMock = vi.fn();
@@ -33,7 +34,7 @@ function params(moment: string) {
 
 beforeEach(() => {
   vi.stubEnv("CRON_SECRET", "test-secret");
-  ensureSeedUserMock.mockResolvedValue({ id: "user-1" });
+  findManyMock.mockResolvedValue([{ id: "user-1" }]);
   getScheduleForUserMock.mockResolvedValue({ noSchoolDays: [] });
   sendPushToUserMock.mockResolvedValue({ sent: 1, removed: 0 });
 });
@@ -82,7 +83,7 @@ describe("GET /api/cron/[moment] -- validation (spec 3.1)", () => {
   });
 });
 
-describe("GET /api/cron/[moment] -- envoi (spec 3.1)", () => {
+describe("GET /api/cron/[moment] -- envoi multi-famille (évolution auth)", () => {
   it("200 et envoie la notification pour un jour scolaire normal", async () => {
     const { GET } = await import("./route");
     const response = await GET(
@@ -91,12 +92,21 @@ describe("GET /api/cron/[moment] -- envoi (spec 3.1)", () => {
     );
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual({ skipped: false, sent: 1, removed: 0 });
+    expect(body).toEqual({
+      totalUsers: 1,
+      skippedNoSchool: 0,
+      sent: 1,
+      removed: 0,
+      failedUserIds: [],
+    });
     expect(sendPushToUserMock).toHaveBeenCalledTimes(1);
   });
 
   it("skip sans envoyer un jour marqué NoSchoolDay", async () => {
-    const todayIso = new Date().toISOString().slice(0, 10);
+    // Guadeloupe (AD-4), pas UTC brut -- sinon ce test devient flaky entre
+    // 00h et 4h UTC (00h-0h America/Guadeloupe restant "hier" côté serveur),
+    // constaté en exécutant la suite dans cette fenêtre (correctif).
+    const todayIso = schoolDateToIso(getTodaySchoolDate(new Date()));
     getScheduleForUserMock.mockResolvedValue({
       noSchoolDays: [{ date: new Date(`${todayIso}T00:00:00.000Z`) }],
     });
@@ -108,12 +118,43 @@ describe("GET /api/cron/[moment] -- envoi (spec 3.1)", () => {
     );
     expect(response.status).toBe(200);
     const body = await response.json();
-    expect(body).toEqual({ skipped: true, reason: "no-school-day" });
+    expect(body).toEqual({
+      totalUsers: 1,
+      skippedNoSchool: 1,
+      sent: 0,
+      removed: 0,
+      failedUserIds: [],
+    });
     expect(sendPushToUserMock).not.toHaveBeenCalled();
   });
 
-  it("500 avec un corps diagnosticable si une dépendance lève (jamais un crash silencieux)", async () => {
-    sendPushToUserMock.mockRejectedValue(new Error("VAPID mal configurée"));
+  it("traite chaque famille indépendamment -- l'échec d'une famille n'empêche pas les autres de recevoir leur rappel", async () => {
+    findManyMock.mockResolvedValue([{ id: "user-1" }, { id: "user-2" }]);
+    getScheduleForUserMock.mockImplementation(async (userId: string) => {
+      if (userId === "user-1") throw new Error("EDT introuvable");
+      return { noSchoolDays: [] };
+    });
+
+    const { GET } = await import("./route");
+    const response = await GET(
+      request({ authorization: "Bearer test-secret" }),
+      params("soir")
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body).toEqual({
+      totalUsers: 2,
+      skippedNoSchool: 0,
+      sent: 1,
+      removed: 0,
+      failedUserIds: ["user-1"],
+    });
+    expect(sendPushToUserMock).toHaveBeenCalledTimes(1);
+    expect(sendPushToUserMock).toHaveBeenCalledWith("user-2", expect.anything());
+  });
+
+  it("500 avec un corps diagnosticable si la liste des familles est inaccessible (jamais un crash silencieux)", async () => {
+    findManyMock.mockRejectedValue(new Error("DB indisponible"));
 
     const { GET } = await import("./route");
     const response = await GET(

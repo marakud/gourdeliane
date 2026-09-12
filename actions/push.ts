@@ -1,6 +1,6 @@
 "use server";
 
-import { ensureSeedUser } from "@/data/user";
+import { requireUserId } from "@/lib/current-user";
 import { saveSubscription } from "@/data/push-subscription";
 
 // Story 3.1 -- seule mutation liée aux abonnements Web Push (AD-1). Chaque
@@ -42,9 +42,9 @@ export async function subscribeToPush(
   }
 
   try {
-    const user = await ensureSeedUser();
+    const userId = await requireUserId();
     await saveSubscription({
-      userId: user.id,
+      userId,
       endpoint: input.endpoint,
       p256dh: input.keys.p256dh,
       auth: input.keys.auth,

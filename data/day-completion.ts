@@ -75,11 +75,10 @@ export async function recomputeAndPersistSoirCompletion(
   userId: string,
   now: Date
 ): Promise<{ complete: boolean }> {
-  // `userId` est déjà celui de l'appelant (résolu par `ensureSeedUser()` côté
-  // action) -- relit sa propre ligne par cet id plutôt que de rappeler
-  // `ensureSeedUser()` (qui retourne toujours le même unique utilisateur
-  // aujourd'hui, mais ignorerait silencieusement `userId` si l'app gagnait un
-  // jour plusieurs utilisateurs).
+  // `userId` est déjà celui de l'appelant (résolu par `requireUserId()` côté
+  // action, cf. lib/current-user.ts) -- relit sa propre ligne par cet id
+  // plutôt que de repasser par la session (chaque famille a son propre
+  // utilisateur depuis l'ajout de l'authentification multi-famille).
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const weekAReferenceMondayIso = user.weekAReferenceMonday
     ? user.weekAReferenceMonday.toISOString().slice(0, 10)

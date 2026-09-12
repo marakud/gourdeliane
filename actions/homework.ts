@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ensureSeedUser } from "@/data/user";
+import { requireUserId } from "@/lib/current-user";
 import {
   createDevoir,
   deleteDevoir,
@@ -195,9 +195,9 @@ export async function createDevoirAction(
   }
 
   try {
-    const user = await ensureSeedUser();
+    const userId = await requireUserId();
     const devoir = await createDevoir(
-      user.id,
+      userId,
       parsed.value.subjectId,
       parsed.value.description,
       parsed.value.aRendre,
@@ -233,10 +233,10 @@ export async function updateDevoirAction(
   }
 
   try {
-    const user = await ensureSeedUser();
+    const userId = await requireUserId();
     const devoir = await updateDevoir(
       id,
-      user.id,
+      userId,
       parsed.value.subjectId,
       parsed.value.description,
       parsed.value.aRendre,
@@ -272,8 +272,8 @@ export async function toggleDevoirDoneAction(
   }
 
   try {
-    const user = await ensureSeedUser();
-    await toggleDevoirDone(input.id, user.id, input.done);
+    const userId = await requireUserId();
+    await toggleDevoirDone(input.id, userId, input.done);
     revalidateAccueil();
     revalidateEdt();
     // Story 2.7 (AD-5) -- un devoir "à rendre" échéant demain fait partie de
@@ -283,7 +283,7 @@ export async function toggleDevoirDoneAction(
     // le retour `{ ok: true }` décidé (via safeRecomputeSoirCompletion, qui
     // avale ses propres erreurs) : la bascule elle-même a déjà réussi à ce
     // stade, ce recalcul ne doit jamais la remettre en cause.
-    await safeRecomputeSoirCompletion(user.id);
+    await safeRecomputeSoirCompletion(userId);
     return { ok: true, data: null };
   } catch (error) {
     console.error("toggleDevoirDoneAction failed:", error);
@@ -313,8 +313,8 @@ export async function deleteDevoirAction(
   }
 
   try {
-    const user = await ensureSeedUser();
-    await deleteDevoir(input.id, user.id);
+    const userId = await requireUserId();
+    await deleteDevoir(input.id, userId);
     revalidateAccueil();
     revalidateEdt();
     return { ok: true, data: null };

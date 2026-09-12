@@ -1,6 +1,6 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextRequest } from "next/server";
-import { ensureSeedUser } from "@/data/user";
+import { prisma } from "@/data/prisma";
 import { getScheduleForUser } from "@/data/schedule";
 import { getTodaySchoolDate, schoolDateToIso, schoolDateToWeekday } from "@/domain/school-day";
 import {
@@ -58,30 +58,57 @@ export async function GET(
   // diagnosticable plutôt qu'un 500 opaque sans corps, et ne doit jamais
   // faire échouer silencieusement le Cron Job pour toujours.
   try {
-    const user = await ensureSeedUser();
+    // Authentification multi-famille -- un rappel par famille, jamais un
+    // seul utilisateur unique (ancien `ensureSeedUser()`). Chaque famille est
+    // traitée indépendamment (try/catch par utilisateur, plus bas) : l'échec
+    // d'une famille (VAPID, EDT mal configuré...) ne doit jamais empêcher les
+    // autres de recevoir leur rappel.
+    const users = await prisma.user.findMany({ select: { id: true } });
 
     // "Aujourd'hui" calculé serveur en America/Guadeloupe fixe (AD-4), jamais
-    // depuis l'heure du serveur cron elle-même (qui tourne en UTC).
+    // depuis l'heure du serveur cron elle-même (qui tourne en UTC) --
+    // identique pour toutes les familles (fuseau unique, AD-4).
     const now = new Date();
     const todayDate = getTodaySchoolDate(now);
     const todayIso = schoolDateToIso(todayDate);
     const todayWeekday = schoolDateToWeekday(todayDate);
 
-    const { noSchoolDays } = await getScheduleForUser(user.id);
-    const noSchoolDayIsoSet = new Set(
-      noSchoolDays.map((day) => day.date.toISOString().slice(0, 10))
-    );
+    let totalSent = 0;
+    let totalRemoved = 0;
+    let skippedNoSchool = 0;
+    const failedUserIds: string[] = [];
 
-    if (shouldSkipReminderToday(todayWeekday, todayIso, noSchoolDayIsoSet)) {
-      return Response.json({ skipped: true, reason: "no-school-day" });
+    for (const user of users) {
+      try {
+        const { noSchoolDays } = await getScheduleForUser(user.id);
+        const noSchoolDayIsoSet = new Set(
+          noSchoolDays.map((day) => day.date.toISOString().slice(0, 10))
+        );
+
+        if (shouldSkipReminderToday(todayWeekday, todayIso, noSchoolDayIsoSet)) {
+          skippedNoSchool += 1;
+          continue;
+        }
+
+        const { sent, removed } = await sendPushToUser(
+          user.id,
+          NOTIFICATION_CONTENT[moment]
+        );
+        totalSent += sent;
+        totalRemoved += removed;
+      } catch (error) {
+        console.error(`Cron ${momentSegment} a échoué pour l'utilisateur ${user.id}:`, error);
+        failedUserIds.push(user.id);
+      }
     }
 
-    const { sent, removed } = await sendPushToUser(
-      user.id,
-      NOTIFICATION_CONTENT[moment]
-    );
-
-    return Response.json({ skipped: false, sent, removed });
+    return Response.json({
+      totalUsers: users.length,
+      skippedNoSchool,
+      sent: totalSent,
+      removed: totalRemoved,
+      failedUserIds,
+    });
   } catch (error) {
     console.error(`Cron ${momentSegment} a échoué:`, error);
     return Response.json({ error: "Erreur interne." }, { status: 500 });

@@ -1,7 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { ensureSeedUser, setFirstName, setWeekAReferenceMonday } from "@/data/user";
+import { setFirstName, setWeekAReferenceMonday } from "@/data/user";
+import { requireUserId } from "@/lib/current-user";
 import { isWeekParity, mondayOfIso, shiftIsoDays } from "@/domain/schedule";
 import { getTodaySchoolDate, schoolDateToIso } from "@/domain/school-day";
 
@@ -51,14 +52,14 @@ export async function setCurrentWeekParity(
   }
 
   try {
-    const user = await ensureSeedUser();
+    const userId = await requireUserId();
     const todayIso = schoolDateToIso(getTodaySchoolDate(new Date()));
     const currentMondayIso = mondayOfIso(todayIso);
     const referenceMondayIso =
       parity === "A" ? currentMondayIso : shiftIsoDays(currentMondayIso, -7);
 
     await setWeekAReferenceMonday(
-      user.id,
+      userId,
       new Date(`${referenceMondayIso}T00:00:00.000Z`)
     );
 
@@ -94,8 +95,8 @@ export async function setFirstNameAction(
   }
 
   try {
-    const user = await ensureSeedUser();
-    await setFirstName(user.id, trimmed.length > 0 ? trimmed : null);
+    const userId = await requireUserId();
+    await setFirstName(userId, trimmed.length > 0 ? trimmed : null);
     revalidateReglages();
     revalidateAccueil();
     return { ok: true, data: null };

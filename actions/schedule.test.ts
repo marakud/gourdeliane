@@ -1,24 +1,31 @@
 import "dotenv/config";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "../data/prisma";
-import { ensureSeedUser } from "../data/user";
 import { createSlot, updateSlot } from "./schedule";
 
 // Tests d'intégration contre la vraie base de dev (SQLite) -- createSlot/
-// updateSlot appellent en interne `ensureSeedUser()` (même contrainte
-// qu'actions/checklist.test.ts : pas de userId synthétique possible). Le
-// nettoyage se fait par nom de matière distinctif plutôt que par userId.
-// User.weekAReferenceMonday est un champ singleton du seed user réel --
-// sauvegardé puis restauré après coup (`fileParallelism: false`,
-// vitest.config.ts, garantit qu'aucun autre fichier de test ne le touche en
-// même temps).
+// updateSlot résolvent l'utilisateur depuis la session (`requireCurrentUser`,
+// lib/current-user.ts), mocké ici vers un utilisateur de test synthétique
+// (jamais le vrai utilisateur unique d'avant l'authentification). Le mock
+// relit `TEST_USER_ID` en base à chaque appel (pas une valeur figée) : ces
+// tests mutent `weekAReferenceMonday` directement puis vérifient que
+// l'action relit bien la valeur courante. `onDelete: Cascade`
+// (User -> Subject -> ScheduleSlot) nettoie tout via la suppression de
+// l'utilisateur de test en `afterAll`.
+const TEST_USER_ID = "test-user-actions-schedule";
 const TEST_SUBJECT_NAME = "action-test-week-parity-subject";
 
-let originalReference: Date | null = null;
+vi.mock("@/lib/current-user", () => ({
+  requireCurrentUser: async () =>
+    prisma.user.findUniqueOrThrow({ where: { id: TEST_USER_ID } }),
+}));
 
 beforeAll(async () => {
-  const user = await ensureSeedUser();
-  originalReference = user.weekAReferenceMonday;
+  await prisma.user.upsert({
+    where: { id: TEST_USER_ID },
+    update: {},
+    create: { id: TEST_USER_ID },
+  });
 });
 
 afterEach(async () => {
@@ -31,19 +38,14 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
-  const user = await ensureSeedUser();
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { weekAReferenceMonday: originalReference },
-  });
+  await prisma.user.delete({ where: { id: TEST_USER_ID } });
   await prisma.$disconnect();
 });
 
 describe("createSlot / updateSlot -- garde-fou semaine A/B (Story 1.4, spec I/O matrix)", () => {
   it("rejette la création d'un créneau semaine A quand aucune référence n'est configurée", async () => {
-    const user = await ensureSeedUser();
     await prisma.user.update({
-      where: { id: user.id },
+      where: { id: TEST_USER_ID },
       data: { weekAReferenceMonday: null },
     });
 
@@ -64,9 +66,8 @@ describe("createSlot / updateSlot -- garde-fou semaine A/B (Story 1.4, spec I/O 
   });
 
   it("accepte la création d'un créneau semaine A une fois la référence configurée", async () => {
-    const user = await ensureSeedUser();
     await prisma.user.update({
-      where: { id: user.id },
+      where: { id: TEST_USER_ID },
       data: { weekAReferenceMonday: new Date("2026-09-07T00:00:00.000Z") },
     });
 
@@ -88,9 +89,8 @@ describe("createSlot / updateSlot -- garde-fou semaine A/B (Story 1.4, spec I/O 
   });
 
   it('crée un créneau "toutes les semaines" sans référence configurée (comportement historique préservé)', async () => {
-    const user = await ensureSeedUser();
     await prisma.user.update({
-      where: { id: user.id },
+      where: { id: TEST_USER_ID },
       data: { weekAReferenceMonday: null },
     });
 
@@ -112,9 +112,8 @@ describe("createSlot / updateSlot -- garde-fou semaine A/B (Story 1.4, spec I/O 
   });
 
   it("rejette la modification d'un créneau existant vers semaine B quand aucune référence n'est configurée", async () => {
-    const user = await ensureSeedUser();
     await prisma.user.update({
-      where: { id: user.id },
+      where: { id: TEST_USER_ID },
       data: { weekAReferenceMonday: new Date("2026-09-07T00:00:00.000Z") },
     });
 
@@ -129,7 +128,7 @@ describe("createSlot / updateSlot -- garde-fou semaine A/B (Story 1.4, spec I/O 
     if (!created.ok) return;
 
     await prisma.user.update({
-      where: { id: user.id },
+      where: { id: TEST_USER_ID },
       data: { weekAReferenceMonday: null },
     });
 

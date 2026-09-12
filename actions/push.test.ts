@@ -1,16 +1,31 @@
 import "dotenv/config";
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "../data/prisma";
 import { subscribeToPush } from "./push";
 
 // Tests d'intégration contre la vraie base de dev (SQLite), même convention
-// que actions/checklist.test.ts -- `subscribeToPush` appelle en interne
-// `ensureSeedUser()`, pas de userId synthétique possible. Nettoyage par
-// `endpoint` (distinctif à chaque test).
+// que actions/checklist.test.ts -- `subscribeToPush` résout l'utilisateur
+// depuis la session (`requireUserId`, lib/current-user.ts), mocké ici vers
+// un utilisateur de test synthétique. Nettoyage par `endpoint` (distinctif à
+// chaque test) plutôt que par userId (léger, pas besoin de cascade ici).
+const TEST_USER_ID = "test-user-actions-push";
+
+vi.mock("@/lib/current-user", () => ({
+  requireUserId: async () => TEST_USER_ID,
+}));
+
 const TEST_ENDPOINTS = [
   "https://push.example/action-test-valid",
   "https://push.example/action-test-upsert",
 ];
+
+beforeAll(async () => {
+  await prisma.user.upsert({
+    where: { id: TEST_USER_ID },
+    update: {},
+    create: { id: TEST_USER_ID },
+  });
+});
 
 afterEach(async () => {
   await prisma.pushSubscription.deleteMany({
@@ -19,6 +34,7 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  await prisma.user.delete({ where: { id: TEST_USER_ID } });
   await prisma.$disconnect();
 });
 

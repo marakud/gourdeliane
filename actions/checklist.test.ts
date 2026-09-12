@@ -1,15 +1,12 @@
 import "dotenv/config";
-import { afterAll, afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "../data/prisma";
-import { ensureSeedUser } from "../data/user";
 import { listFixedChecklistItems } from "../data/checklist";
 import {
   CHECKLIST_SOURCE_TYPE_DEVOIR_A_RENDRE,
   CHECKLIST_TYPE_MATIN,
   DEFAULT_MATIN_ITEMS,
 } from "../domain/checklist";
-import { DAY_COMPLETION_MOMENT_SOIR } from "../domain/day-completion";
-import { getTodaySchoolDate, schoolDateToIso } from "../domain/school-day";
 import {
   createRetourChecklistItem,
   toggleChecklistItem,
@@ -18,17 +15,31 @@ import {
   toggleRevisionsChecklistItem,
 } from "./checklist";
 
-// Tests d'intégration contre la vraie base de dev (SQLite). Contrairement à
-// data/schedule.test.ts / data/checklist.test.ts (fonctions data/ prenant un
-// userId explicite), ces actions appellent en interne `ensureSeedUser()` --
-// pas de userId synthétique possible ici, elles agissent toujours sur
-// l'utilisateur unique réel de l'app (cohérent avec le reste du produit).
-// Le nettoyage se fait donc par `sourceId` (distinctif à chaque test) plutôt
-// que par userId.
+// Tests d'intégration contre la vraie base de dev (SQLite). Ces actions
+// résolvent désormais l'utilisateur depuis la session (`requireUserId`,
+// lib/current-user.ts, authentification multi-famille) -- mocké ici vers un
+// utilisateur de test synthétique (même convention que data/day-completion.test.ts),
+// jamais le vrai utilisateur unique d'avant l'authentification. Le nettoyage
+// se fait par `sourceId` (distinctif à chaque test) plutôt que par userId,
+// pour garder l'isolation déjà en place entre les `it()` de ce fichier.
 //
 // `revalidatePath` lève hors d'une requête Next.js (confirmé pendant la
 // revue de la story 2.2) -- avalé par `safeRevalidate`, donc ces actions
 // restent testables directement ici sans serveur Next.js démarré.
+const TEST_USER_ID = "test-user-actions-checklist";
+
+vi.mock("@/lib/current-user", () => ({
+  requireUserId: async () => TEST_USER_ID,
+}));
+
+beforeAll(async () => {
+  await prisma.user.upsert({
+    where: { id: TEST_USER_ID },
+    update: {},
+    create: { id: TEST_USER_ID },
+  });
+});
+
 const TEST_SOURCE_IDS = [
   "action-test-sac-item",
   "action-test-bad-type",
@@ -52,21 +63,13 @@ afterEach(async () => {
 
 afterAll(async () => {
   // Story 2.7 -- `toggleChecklistItem`/`toggleRevisionsChecklistItem`
-  // appellent désormais `recomputeAndPersistSoirCompletion` sur le VRAI
-  // utilisateur (`ensureSeedUser()`, jamais un userId synthétique ici) avec
-  // `new Date()` -- chaque test ci-dessus écrit donc aussi une ligne
-  // `DayCompletion` (SOIR, aujourd'hui réel) sur la vraie base de dev.
-  // Nettoyée ici plutôt que laissée s'accumuler à chaque exécution de la
-  // suite (correctif de revue).
-  const user = await ensureSeedUser();
-  const todayIso = schoolDateToIso(getTodaySchoolDate(new Date()));
-  await prisma.dayCompletion.deleteMany({
-    where: {
-      userId: user.id,
-      date: new Date(`${todayIso}T00:00:00.000Z`),
-      moment: DAY_COMPLETION_MOMENT_SOIR,
-    },
-  });
+  // appellent désormais `recomputeAndPersistSoirCompletion` sur l'utilisateur
+  // de test (`TEST_USER_ID`, via `requireUserId` mocké) avec `new Date()` --
+  // chaque test ci-dessus écrit donc aussi une ligne `DayCompletion` (SOIR,
+  // aujourd'hui réel). `onDelete: Cascade` sur `User` nettoie tout en un
+  // coup (même convention que data/day-completion.test.ts), plus simple que
+  // cibler `DayCompletion` seule.
+  await prisma.user.delete({ where: { id: TEST_USER_ID } });
   await prisma.$disconnect();
 });
 
@@ -258,9 +261,8 @@ describe("createRetourChecklistItem -- création RETOUR (spec 2.3)", () => {
     });
     expect(result.ok).toBe(true);
 
-    const user = await ensureSeedUser();
     const matinItems = await listFixedChecklistItems(
-      user.id,
+      TEST_USER_ID,
       CHECKLIST_TYPE_MATIN,
       DEFAULT_MATIN_ITEMS
     );

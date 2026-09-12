@@ -22,6 +22,15 @@ model User {
   id        String   @id @default(cuid())
   createdAt DateTime @default(now())
 
+  // Authentification multi-famille (evolution CartableFlow) -- `email` reste
+  // `null` pour l'unique utilisateur historique (pré-authentification) tant
+  // qu'il n'a pas été rattaché à un compte via l'inscription
+  // (actions/auth.ts::registerAction) ; `passwordHash` (bcrypt) ne stocke
+  // jamais le mot de passe en clair. Session JWT (Auth.js/next-auth) : pas de
+  // table Account/Session/VerificationToken, ce couple de champs suffit.
+  email        String? @unique
+  passwordHash String?
+
   // Prénom affiché dans le message d'accueil ("Bonjour {firstName} !",
   // app/(accueil)/page.tsx) -- optionnel, configuré depuis Réglages
   // (actions/settings.ts::setFirstNameAction). `null` tant que non configuré :

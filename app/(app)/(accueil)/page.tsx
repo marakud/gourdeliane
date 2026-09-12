@@ -1,6 +1,6 @@
 import { Sofa } from "lucide-react";
 import { connection } from "next/server";
-import { ensureSeedUser } from "@/data/user";
+import { requireCurrentUser } from "@/lib/current-user";
 import { getScheduleForUser } from "@/data/schedule";
 import {
   listChecklistItemStates,
@@ -102,7 +102,7 @@ export default async function AccueilPage() {
   // d'elles-mêmes, cf. app/edt/page.tsx (Story 1.3).
   await connection();
 
-  const user = await ensureSeedUser();
+  const user = await requireCurrentUser();
   const { subjects, scheduleSlots, noSchoolDays } = await getScheduleForUser(
     user.id
   );

@@ -1,5 +1,7 @@
 import { connection } from "next/server";
-import { ensureSeedUser } from "@/data/user";
+import { requireCurrentUser } from "@/lib/current-user";
+import { signOut } from "@/auth";
+import { Button } from "@/components/ui/button";
 import { listFixedChecklistItems, listSubjectsWithItems } from "@/data/checklist";
 import {
   CHECKLIST_TYPE_MATIN,
@@ -28,7 +30,7 @@ export default async function ReglagesPage() {
   // ne jamais refléter un objet ajouté/modifié/supprimé après coup.
   await connection();
 
-  const user = await ensureSeedUser();
+  const user = await requireCurrentUser();
   const [subjects, matinItems, retourItems] = await Promise.all([
     listSubjectsWithItems(user.id),
     listFixedChecklistItems(user.id, CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS),
@@ -92,6 +94,17 @@ export default async function ReglagesPage() {
         items={retourItems.map((item) => ({ id: item.id, label: item.label }))}
         createAction={createRetourChecklistItem}
       />
+
+      <form
+        action={async () => {
+          "use server";
+          await signOut({ redirectTo: "/login" });
+        }}
+      >
+        <Button type="submit" variant="outline" className="h-11 w-full">
+          Se déconnecter
+        </Button>
+      </form>
     </div>
   );
 }

@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Baloo_2, Nunito } from "next/font/google";
-import { TopBar } from "@/components/nav/top-bar";
-import { BottomNav } from "@/components/nav/bottom-nav";
 import "./globals.css";
 
 // Baloo 2 -- display/heading font (UX-DR1)
@@ -36,9 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${baloo2.variable} ${nunito.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-surface-base">
-        <TopBar />
-        <main className="flex-1">{children}</main>
-        <BottomNav />
+        {children}
       </body>
     </html>
   );

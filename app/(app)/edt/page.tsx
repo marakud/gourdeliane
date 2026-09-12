@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { ensureSeedUser } from "@/data/user";
+import { requireCurrentUser } from "@/lib/current-user";
 import { getScheduleForUser } from "@/data/schedule";
 import { listDevoirs } from "@/data/homework";
 import { EdtViewTabs } from "@/components/schedule/edt-view-tabs";
@@ -23,7 +23,7 @@ export default async function EdtPage() {
   // chargement de page plutôt que de rester bloqués au jour du déploiement.
   await connection();
 
-  const user = await ensureSeedUser();
+  const user = await requireCurrentUser();
   const { subjects, scheduleSlots, noSchoolDays } = await getScheduleForUser(
     user.id
   );

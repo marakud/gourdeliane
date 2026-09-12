@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { isWeekParity, validateSlot, type Weekday } from "@/domain/schedule";
-import { ensureSeedUser } from "@/data/user";
+import { requireCurrentUser } from "@/lib/current-user";
 import {
   createScheduleSlot,
   deleteScheduleSlot,
@@ -70,7 +70,7 @@ export async function createSlot(
     input.weekParity && isWeekParity(input.weekParity) ? input.weekParity : null;
 
   try {
-    const user = await ensureSeedUser();
+    const user = await requireCurrentUser();
     if (weekParity && !user.weekAReferenceMonday) {
       return {
         ok: false,
@@ -111,7 +111,7 @@ export async function updateSlot(
     input.weekParity && isWeekParity(input.weekParity) ? input.weekParity : null;
 
   try {
-    const user = await ensureSeedUser();
+    const user = await requireCurrentUser();
     if (weekParity && !user.weekAReferenceMonday) {
       return {
         ok: false,
@@ -142,7 +142,7 @@ export async function updateSlot(
 
 export async function deleteSlot(id: string): Promise<ActionResult<null>> {
   try {
-    const user = await ensureSeedUser();
+    const user = await requireCurrentUser();
     await deleteScheduleSlot(id, user.id);
     revalidateEdt();
     return { ok: true, data: null };
@@ -164,7 +164,7 @@ export async function markNoSchoolDay(
   }
 
   try {
-    const user = await ensureSeedUser();
+    const user = await requireCurrentUser();
     await setNoSchoolDay(user.id, parsed);
     revalidateEdt();
     return { ok: true, data: null };
@@ -186,7 +186,7 @@ export async function unmarkNoSchoolDay(
   }
 
   try {
-    const user = await ensureSeedUser();
+    const user = await requireCurrentUser();
     await unsetNoSchoolDay(user.id, parsed);
     revalidateEdt();
     return { ok: true, data: null };

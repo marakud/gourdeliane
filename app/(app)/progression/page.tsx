@@ -1,5 +1,5 @@
 import { connection } from "next/server";
-import { ensureSeedUser } from "@/data/user";
+import { requireUserId } from "@/lib/current-user";
 import { getStreakForUser } from "@/data/streak";
 import { computeBadges } from "@/domain/badges";
 import { StreakHero } from "@/components/progression/streak-hero";
@@ -11,7 +11,7 @@ export default async function ProgressionPage() {
   // dynamique d'elle-même, cf. AGENTS.md).
   await connection();
 
-  const user = await ensureSeedUser();
+  const userId = await requireUserId();
   // Le streak est un affichage secondaire, jamais un chemin critique --
   // une donnée historique inattendue ne doit jamais faire planter tout
   // l'écran Progression (contrairement à un échec sur Accueil/EDT, qui
@@ -20,7 +20,7 @@ export default async function ProgressionPage() {
   // retombe sur 0/0 -- jamais un streak inventé.
   let streak = { current: 0, best: 0 };
   try {
-    streak = await getStreakForUser(user.id, new Date());
+    streak = await getStreakForUser(userId, new Date());
   } catch (error) {
     console.error("getStreakForUser a échoué, repli sur 0/0 :", error);
   }
