@@ -5,8 +5,6 @@
 // les dates "aujourd'hui" sont toujours reçues en `todayIso` explicite par
 // l'appelant (app/(accueil)/page.tsx, calculé via domain/school-day.ts).
 
-import { WEEKDAY_LABELS, type Weekday } from "./schedule";
-
 // Évolution CartableFlow (modèle de tâches enrichi) -- statut à 3 valeurs,
 // coexiste avec `done` (AD-7) plutôt que de le remplacer : `done` reste la
 // seule source de vérité pour le Sac du soir/streak/DevoirsList, `status`
@@ -156,9 +154,9 @@ export function formatEcheanceLabel(echeanceIso: string): string {
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
-/** Devoir brut (déjà résolu par data/homework.ts::listDevoirs), échéance et
- * placement EDT déjà réduits à des chaînes ISO/brutes par l'appelant --
- * cette fonction ne touche jamais un objet `Date` (AD-1). */
+/** Devoir brut (déjà résolu par data/homework.ts::listDevoirs), échéance
+ * déjà réduite à une chaîne ISO par l'appelant -- cette fonction ne touche
+ * jamais un objet `Date` (AD-1). */
 export interface DevoirTaskViewInput {
   id: string;
   description: string;
@@ -167,8 +165,7 @@ export interface DevoirTaskViewInput {
   status: DevoirStatus;
   estimatedMinutes: number | null;
   echeanceIso: string | null;
-  plannedWeekday: string | null;
-  plannedStartTime: string | null;
+  echeanceTime: string | null;
   subject: { id: string; name: string; colorIndex: number };
 }
 
@@ -185,19 +182,18 @@ export interface DevoirTaskView {
   estimatedMinutes: number | null;
   subject: { id: string; name: string; colorIndex: number };
   echeanceLabel: string | null;
+  echeanceTime: string | null;
   daysRemaining: number | null;
   echeanceIso: string | null;
-  planned: { weekday: string; startTime: string } | null;
-  plannedRaw: { weekday: string; startTime: string } | null;
   taskView: TaskViewCategory;
 }
 
 /**
  * Enrichit un devoir brut en vue prête à afficher -- échéance formatée,
- * jours restants, placement EDT en libellé français, classification "Mes
- * tâches". Fonction pure unique (AD-5) : jamais dupliquée entre
- * app/(app)/(accueil)/page.tsx et app/(app)/mes-taches/page.tsx, qui
- * affichent toutes deux des devoirs sous cette même forme.
+ * jours restants, classification "Mes tâches". Fonction pure unique (AD-5) :
+ * jamais dupliquée entre app/(app)/(accueil)/page.tsx et
+ * app/(app)/mes-taches/page.tsx, qui affichent toutes deux des devoirs sous
+ * cette même forme.
  */
 export function toDevoirTaskView(
   devoir: DevoirTaskViewInput,
@@ -218,19 +214,12 @@ export function toDevoirTaskView(
     echeanceLabel: devoir.echeanceIso
       ? formatEcheanceLabel(devoir.echeanceIso)
       : null,
+    // Une heure sans échéance n'a pas de sens (actions/homework.ts le
+    // rejette à l'écriture) -- au cas où une ligne historique en aurait
+    // quand même une (ex. donnée migrée), on ne l'affiche jamais seule.
+    echeanceTime: devoir.echeanceIso ? devoir.echeanceTime : null,
     daysRemaining,
     echeanceIso: devoir.echeanceIso,
-    planned:
-      devoir.plannedWeekday && devoir.plannedStartTime
-        ? {
-            weekday: WEEKDAY_LABELS[devoir.plannedWeekday as Weekday],
-            startTime: devoir.plannedStartTime,
-          }
-        : null,
-    plannedRaw:
-      devoir.plannedWeekday && devoir.plannedStartTime
-        ? { weekday: devoir.plannedWeekday, startTime: devoir.plannedStartTime }
-        : null,
     taskView: classifyTaskView(devoir.done, daysRemaining),
   };
 }
@@ -245,11 +234,13 @@ export function formatEstimatedDuration(minutes: number): string {
   return `${hours} h ${String(remainder).padStart(2, "0")}`;
 }
 
-/** Un devoir programmé pour un jour donné (Story 2.4, retour utilisateur
- * "programmer le devoir dans l'EDT" -- placé dans un trou libre, pas
- * rattaché à un créneau/cours existant, cf. `computeWeeklyFreeGaps`,
- * domain/schedule.ts) -- projection minimale affichée en lecture seule dans
- * la vue EDT du jour concerné (components/schedule/day-view.tsx).
+/** Un devoir dont l'échéance tombe le jour affiché ET porte une heure
+ * précise (évolution CartableFlow, calendrier unifié -- remplace l'ancien
+ * placement `plannedWeekday`/`plannedStartTime`, indépendant de l'échéance)
+ * -- projection minimale affichée en lecture seule dans la vue EDT du jour
+ * concerné (components/schedule/day-view.tsx). Le nom du champ
+ * `plannedStartTime` (plutôt que `echeanceTime`) est conservé tel quel : ce
+ * type alimente `DayViewPlannedDevoir`, qui n'a pas besoin de changer.
  */
 export interface PlannedDevoirView {
   id: string;
@@ -260,33 +251,38 @@ export interface PlannedDevoirView {
 }
 
 /**
- * Filtre les devoirs programmés pour `weekday`, triés par heure. Pure : ne
- * fait aucune requête, reçoit `devoirs` déjà chargés par l'appelant
- * (app/edt/page.tsx). Un devoir sans `plannedWeekday`/`plannedStartTime`
- * (non programmé) n'apparaît jamais ici, quel que soit `weekday`.
+ * Filtre les devoirs dont l'échéance exacte est `dateIso` ET qui portent une
+ * heure précise, triés par heure. Pure : ne fait aucune requête, reçoit
+ * `devoirs` déjà chargés par l'appelant (app/edt/page.tsx). Un devoir sans
+ * heure (échéance seule, sans `echeanceTime`) n'apparaît jamais ici -- il a
+ * déjà sa place dans "Devoirs"/"Mes tâches", cette carte ne montre que ce qui
+ * est ancré à un moment précis du jour. Contrairement à l'ancien
+ * `filterDevoirsForWeekday` (jour de semaine récurrent, sans année/mois/jour),
+ * une correspondance par date exacte ne re-fait plus surface la semaine
+ * suivante une fois la date passée.
  */
-export function filterDevoirsForWeekday(
+export function filterDevoirsForDate(
   devoirs: readonly {
     id: string;
     description: string;
     done: boolean;
-    plannedWeekday: string | null;
-    plannedStartTime: string | null;
+    echeanceIso: string | null;
+    echeanceTime: string | null;
     subject: { name: string; colorIndex: number };
   }[],
-  weekday: Weekday
+  dateIso: string
 ): PlannedDevoirView[] {
   return devoirs
     .filter(
-      (devoir): devoir is typeof devoir & { plannedStartTime: string } =>
-        devoir.plannedWeekday === weekday && devoir.plannedStartTime !== null
+      (devoir): devoir is typeof devoir & { echeanceTime: string } =>
+        devoir.echeanceIso === dateIso && devoir.echeanceTime !== null
     )
     .map((devoir) => ({
       id: devoir.id,
       description: devoir.description,
       done: devoir.done,
       subject: devoir.subject,
-      plannedStartTime: devoir.plannedStartTime,
+      plannedStartTime: devoir.echeanceTime,
     }))
     .sort((a, b) => a.plannedStartTime.localeCompare(b.plannedStartTime));
 }

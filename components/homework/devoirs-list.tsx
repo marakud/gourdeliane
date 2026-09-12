@@ -39,12 +39,10 @@ export interface DevoirView {
   // ISO "yyyy-MM-dd" brute (retour utilisateur -- édition), à côté
   // d'`echeanceLabel` déjà formatée pour l'affichage.
   echeanceIso: string | null;
-  // Placement dans un trou libre de l'EDT (retour utilisateur Story 2.4,
-  // 2e itération) -- `weekday` déjà en libellé français (WEEKDAY_LABELS)
-  // pour l'affichage ; `plannedRaw` porte le code Weekday brut ("MONDAY")
-  // nécessaire pour réinitialiser le FreeTimePicker en édition.
-  planned: { weekday: string; startTime: string } | null;
-  plannedRaw: { weekday: string; startTime: string } | null;
+  // Heure optionnelle accompagnant l'échéance (évolution CartableFlow --
+  // calendrier unifié, remplace l'ancien placement EDT indépendant
+  // `planned`/`plannedRaw`) -- "HH:mm", `null` si aucune heure précise.
+  echeanceTime: string | null;
   // Classification pour la page "Mes tâches" (domain/homework.ts::classifyTaskView)
   // -- inutile pour ce bloc (Accueil ne filtre pas par vue), calculée quand
   // même par `toDevoirTaskView` en amont, sans coût à porter ici.

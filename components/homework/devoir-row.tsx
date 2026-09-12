@@ -92,12 +92,11 @@ export function DevoirRow({
                 <> · Prévu : {formatEstimatedDuration(devoir.estimatedMinutes)}</>
               )}
               {devoir.echeanceLabel && devoir.daysRemaining !== null && (
-                <> · Échéance : {devoir.echeanceLabel} ({daysRemainingLabel(devoir.daysRemaining)})</>
-              )}
-              {devoir.planned && (
                 <>
                   {" "}
-                  · {devoir.planned.weekday} {devoir.planned.startTime}
+                  · Échéance : {devoir.echeanceLabel}
+                  {devoir.echeanceTime && <> à {devoir.echeanceTime}</>} (
+                  {daysRemainingLabel(devoir.daysRemaining)})
                 </>
               )}
               {inProgress && (
@@ -140,8 +139,7 @@ export function DevoirRow({
             description: devoir.description,
             aRendre: devoir.aRendre,
             echeance: devoir.echeanceIso ?? "",
-            plannedWeekday: devoir.plannedRaw?.weekday ?? "",
-            plannedStartTime: devoir.plannedRaw?.startTime ?? "",
+            echeanceTime: devoir.echeanceTime ?? "",
             estimatedMinutes: devoir.estimatedMinutes,
           }}
         />

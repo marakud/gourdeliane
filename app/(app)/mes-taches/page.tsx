@@ -44,8 +44,7 @@ export default async function MesTachesPage() {
         echeanceIso: devoir.echeance
           ? devoir.echeance.toISOString().slice(0, 10)
           : null,
-        plannedWeekday: devoir.plannedWeekday,
-        plannedStartTime: devoir.plannedStartTime,
+        echeanceTime: devoir.echeanceTime,
         subject: {
           id: devoir.subject.id,
           name: devoir.subject.name,

@@ -233,27 +233,31 @@ model FixedChecklistDefaultsSeed {
 // qu'il n'est pas supprimé explicitement (actions/homework.ts::deleteDevoirAction)
 // -- jamais purgé automatiquement (Never de la spec).
 //
-// `plannedWeekday`/`plannedStartTime` (optionnels, retour utilisateur Story
-// 2.4) -- placement dans un trou libre de l'EDT (lundi-dimanche, 8h-22h),
-// PAS un rattachement à un `ScheduleSlot` existant (approche abandonnée :
-// l'objectif est de trouver de la disponibilité, pas de coller le devoir à
-// un cours). Simple couple jour+heure en `String`, même convention que
-// `ScheduleSlot.startTime` -- aucune validation de non-chevauchement côté
-// serveur (le sélecteur ne propose déjà que des trous libres, domain/schedule.ts::computeWeeklyFreeGaps).
+// `echeanceTime` (évolution CartableFlow -- calendrier unifié, remplace les
+// anciens `plannedWeekday`/`plannedStartTime` de Story 2.4) : heure optionnelle
+// accompagnant `echeance`, jamais l'inverse (une heure sans échéance n'a pas
+// de sens, validé par actions/homework.ts). Auparavant, le placement dans un
+// trou libre de l'EDT (jour de semaine récurrent, sans date réelle) était un
+// champ séparé et indépendant de l'échéance -- source de confusion (retour
+// utilisateur : un devoir "programmé samedi 11h" via ce second champ
+// n'apparaissait pas dans "Aujourd'hui" côté "Mes tâches", qui ne regarde que
+// l'échéance) et de duplication (deux notions de "quand" pour un même
+// devoir). Un seul couple echeance/echeanceTime sert maintenant à la fois au
+// classement "Mes tâches" et à l'affichage dans l'EDT du jour concerné
+// (domain/homework.ts::filterDevoirsForDate, par date exacte -- ne recourt
+// plus la semaine suivante comme le faisait l'ancien `plannedWeekday`).
 model Devoir {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  subjectId   String
-  subject     Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  description String
-  aRendre     Boolean   @default(false)
-  echeance    DateTime?
-  done        Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-
-  plannedWeekday   Weekday?
-  plannedStartTime String?
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId    String
+  subject      Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  description  String
+  aRendre      Boolean   @default(false)
+  echeance     DateTime?
+  echeanceTime String?
+  done         Boolean   @default(false)
+  createdAt    DateTime  @default(now())
 
   // Évolution CartableFlow (modèle de tâches enrichi) -- `status` ("TODO"/
   // "IN_PROGRESS"/"DONE", domain/homework.ts) coexiste avec `done` plutôt

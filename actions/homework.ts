@@ -13,9 +13,7 @@ import { recomputeAndPersistSoirCompletion } from "@/data/day-completion";
 import {
   DEFAULT_FREE_WINDOW_END,
   DEFAULT_FREE_WINDOW_START,
-  isWeekday,
   TIME_PATTERN,
-  type Weekday,
 } from "@/domain/schedule";
 import { MAX_ESTIMATED_MINUTES } from "@/domain/homework";
 
@@ -54,9 +52,9 @@ function revalidateAccueil() {
 }
 
 function revalidateEdt() {
-  // Un devoir peut être programmé dans un trou libre de l'EDT
-  // (plannedWeekday/plannedStartTime, retour utilisateur Story 2.4) et s'y
-  // afficher -- toute mutation doit donc aussi revalider "/edt", pas
+  // Un devoir dont l'échéance porte une heure précise (echeanceTime,
+  // évolution CartableFlow -- calendrier unifié) s'affiche dans l'EDT du jour
+  // concerné -- toute mutation doit donc aussi revalider "/edt", pas
   // seulement Accueil.
   safeRevalidate("/edt");
 }
@@ -87,12 +85,12 @@ export interface DevoirFormInput {
   description: string;
   // Optionnels (Boundaries spec 2.4) : aucune validation ne les rend requis.
   aRendre?: boolean;
-  echeance?: string; // ISO "yyyy-MM-dd", saisie via <input type="date">
-  // Placement optionnel dans un trou libre de l'EDT (retour utilisateur
-  // Story 2.4, "programmer le devoir dans l'EDT") -- les deux ensemble ou
-  // aucun des deux, jamais l'un sans l'autre.
-  plannedWeekday?: string;
-  plannedStartTime?: string; // "HH:mm"
+  echeance?: string; // ISO "yyyy-MM-dd", saisie via le calendrier unifié
+  // Heure optionnelle accompagnant l'échéance (évolution CartableFlow --
+  // calendrier unifié, remplace l'ancien placement EDT indépendant
+  // `plannedWeekday`/`plannedStartTime` de Story 2.4) -- n'a de sens
+  // qu'accompagnée d'une échéance, jamais seule.
+  echeanceTime?: string; // "HH:mm"
   // Durée estimée en minutes (évolution CartableFlow, facultative) --
   // presets 10/15/20/30/45/60 ou une valeur personnalisée, saisie côté
   // formulaire (HomeworkFormDialog) ; ce champ n'accepte ici qu'un entier
@@ -136,8 +134,7 @@ interface ParsedDevoirInput {
   description: string;
   aRendre: boolean;
   echeance: Date | null;
-  plannedWeekday: Weekday | null;
-  plannedStartTime: string | null;
+  echeanceTime: string | null;
   estimatedMinutes: number | null;
 }
 
@@ -163,12 +160,14 @@ function parseEstimatedMinutes(
  * Valide/normalise un `DevoirFormInput`, partagé par `createDevoirAction` et
  * `updateDevoirAction` (retour utilisateur -- édition, même règles que la
  * création). Matière + description sont les seuls champs obligatoires
- * (Boundaries spec 2.4) -- "à rendre", échéance et placement EDT restent
- * optionnels. Le placement (jour+heure) n'est pas revérifié ici comme
- * "réellement dans un trou libre" (pas de requête sur `ScheduleSlot`) --
- * le sélecteur (`FreeTimePicker`, `domain/schedule.ts::computeWeeklyFreeGaps`)
- * ne propose déjà que des trous libres au moment de l'affichage. Seuls le
- * format et l'appartenance à la fenêtre 8h-22h sont vérifiés ici.
+ * (Boundaries spec 2.4) -- "à rendre" et échéance restent optionnels.
+ * `echeanceTime` n'a de sens qu'accompagnant une échéance (calendrier unifié,
+ * évolution CartableFlow) -- une heure sans échéance est rejetée plutôt que
+ * silencieusement ignorée. La disponibilité réelle du créneau choisi n'est
+ * pas revérifiée ici (pas de requête sur `ScheduleSlot`) -- le sélecteur
+ * (`EcheancePicker`, `domain/schedule.ts::computeWeeklyFreeGaps`) ne propose
+ * déjà que des trous libres au moment de l'affichage. Seuls le format et
+ * l'appartenance à la fenêtre 8h-22h sont vérifiés ici.
  */
 function parseDevoirFormInput(
   input: DevoirFormInput
@@ -189,22 +188,21 @@ function parseDevoirFormInput(
     return { ok: false, error: "Durée estimée invalide." };
   }
 
-  const rawWeekday = input.plannedWeekday?.trim() || "";
-  const rawStartTime = input.plannedStartTime?.trim() || "";
-  if ((rawWeekday.length > 0) !== (rawStartTime.length > 0)) {
-    return { ok: false, error: "Créneau incomplet." };
-  }
-  if (rawWeekday.length > 0 && !isWeekday(rawWeekday)) {
-    return { ok: false, error: "Jour invalide." };
-  }
-  if (rawStartTime.length > 0) {
-    if (!TIME_PATTERN.test(rawStartTime)) {
+  const rawEcheanceTime = input.echeanceTime?.trim() || "";
+  if (rawEcheanceTime.length > 0) {
+    if (echeance.value === null) {
+      return { ok: false, error: "Une heure nécessite une échéance." };
+    }
+    if (!TIME_PATTERN.test(rawEcheanceTime)) {
       return { ok: false, error: "Horaire invalide." };
     }
     // Le sélecteur ne propose que la fenêtre 8h-22h (retour utilisateur --
     // "de 8h à 22h") -- un appel direct pourrait la contourner sans ce
     // garde-fou, même s'il ne vérifie pas la disponibilité réelle du créneau.
-    if (rawStartTime < DEFAULT_FREE_WINDOW_START || rawStartTime > DEFAULT_FREE_WINDOW_END) {
+    if (
+      rawEcheanceTime < DEFAULT_FREE_WINDOW_START ||
+      rawEcheanceTime > DEFAULT_FREE_WINDOW_END
+    ) {
       return { ok: false, error: "Horaire hors de la plage 8h-22h." };
     }
   }
@@ -216,8 +214,7 @@ function parseDevoirFormInput(
       description,
       aRendre: input.aRendre ?? false,
       echeance: echeance.value,
-      plannedWeekday: isWeekday(rawWeekday) ? rawWeekday : null,
-      plannedStartTime: rawStartTime.length > 0 ? rawStartTime : null,
+      echeanceTime: rawEcheanceTime.length > 0 ? rawEcheanceTime : null,
       estimatedMinutes: estimatedMinutes.value,
     },
   };
@@ -242,8 +239,7 @@ export async function createDevoirAction(
       parsed.value.description,
       parsed.value.aRendre,
       parsed.value.echeance,
-      parsed.value.plannedWeekday,
-      parsed.value.plannedStartTime,
+      parsed.value.echeanceTime,
       parsed.value.estimatedMinutes
     );
     revalidateAccueil();
@@ -283,8 +279,7 @@ export async function updateDevoirAction(
       parsed.value.description,
       parsed.value.aRendre,
       parsed.value.echeance,
-      parsed.value.plannedWeekday,
-      parsed.value.plannedStartTime,
+      parsed.value.echeanceTime,
       parsed.value.estimatedMinutes
     );
     revalidateAccueil();

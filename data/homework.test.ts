@@ -49,8 +49,7 @@ describe("createDevoir -- création minimale (spec 2.4 I/O matrix)", () => {
     expect(devoir.echeance).toBeNull();
     expect(devoir.done).toBe(false);
     expect(devoir.subjectId).toBe(subjectId);
-    expect(devoir.plannedWeekday).toBeNull();
-    expect(devoir.plannedStartTime).toBeNull();
+    expect(devoir.echeanceTime).toBeNull();
     expect(devoir.status).toBe(DEVOIR_STATUS_TODO);
     expect(devoir.estimatedMinutes).toBeNull();
   });
@@ -61,7 +60,6 @@ describe("createDevoir -- création minimale (spec 2.4 I/O matrix)", () => {
       subjectId,
       "Exos p.12 avec durée",
       false,
-      null,
       null,
       null,
       30
@@ -84,19 +82,19 @@ describe("createDevoir -- création minimale (spec 2.4 I/O matrix)", () => {
     expect(devoir.echeance?.toISOString()).toBe(echeance.toISOString());
   });
 
-  it("accepte un placement dans un trou libre de l'EDT (retour utilisateur Story 2.4)", async () => {
+  it("accepte une échéance avec heure précise (calendrier unifié, évolution CartableFlow)", async () => {
+    const echeance = new Date("2026-09-17T00:00:00Z");
     const devoir = await createDevoir(
       TEST_USER_ID,
       subjectId,
       "Réviser jeudi 16h",
       false,
-      null,
-      "THURSDAY",
+      echeance,
       "16:00"
     );
 
-    expect(devoir.plannedWeekday).toBe("THURSDAY");
-    expect(devoir.plannedStartTime).toBe("16:00");
+    expect(devoir.echeance?.toISOString()).toBe(echeance.toISOString());
+    expect(devoir.echeanceTime).toBe("16:00");
   });
 });
 
@@ -193,7 +191,6 @@ describe("updateDevoir -- modifie un devoir existant, scopé par (id, userId)", 
       "Description modifiée",
       true,
       echeance,
-      "THURSDAY",
       "16:00",
       45
     );
@@ -201,8 +198,7 @@ describe("updateDevoir -- modifie un devoir existant, scopé par (id, userId)", 
     expect(updated.description).toBe("Description modifiée");
     expect(updated.aRendre).toBe(true);
     expect(updated.echeance?.toISOString()).toBe(echeance.toISOString());
-    expect(updated.plannedWeekday).toBe("THURSDAY");
-    expect(updated.plannedStartTime).toBe("16:00");
+    expect(updated.echeanceTime).toBe("16:00");
     expect(updated.estimatedMinutes).toBe(45);
   });
 
@@ -216,7 +212,6 @@ describe("updateDevoir -- modifie un devoir existant, scopé par (id, userId)", 
       subjectId,
       "Description modifiée sans toucher done",
       false,
-      null,
       null,
       null,
       null
@@ -235,7 +230,6 @@ describe("updateDevoir -- modifie un devoir existant, scopé par (id, userId)", 
         subjectId,
         "Modification non autorisée",
         false,
-        null,
         null,
         null,
         null

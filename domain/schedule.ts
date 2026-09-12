@@ -87,6 +87,23 @@ export function shiftIsoDays(dateIso: string, days: number): string {
 }
 
 /**
+ * Jour de la semaine (`Weekday`) d'une date ISO "yyyy-MM-dd" -- ancrage midi
+ * UTC (même technique que `mondayOfIso`/`computeWeekParity` ci-dessus).
+ * Exportée pour le calendrier unifié du formulaire de devoir (évolution
+ * CartableFlow, `components/homework/echeance-picker.tsx`) : une échéance
+ * choisie sur une date réelle doit pouvoir retrouver les trous libres du jour
+ * de semaine correspondant (`computeWeeklyFreeGaps`), sans dupliquer ce calcul
+ * (déjà fait pour un `SchoolDate` par domain/school-day.ts::schoolDateToWeekday,
+ * mais ce module ne peut pas en dépendre -- school-day.ts importe déjà
+ * `Weekday` depuis ici, une dépendance dans l'autre sens créerait un cycle).
+ */
+export function weekdayOfIso(dateIso: string): Weekday {
+  const noonMs = isoToUtcNoonMs(dateIso);
+  const jsWeekday = new Date(noonMs).getUTCDay(); // 0=dimanche..6=samedi
+  return WEEKDAYS[(jsWeekday + 6) % 7];
+}
+
+/**
  * Calcule si `dateIso` tombe en semaine A ou B, à partir d'un lundi connu
  * appartenant à la semaine A (`weekAReferenceMondayIso`, User.weekAReferenceMonday)
  * -- Story 1.4. Pure, ancrée sur le lundi de chaque semaine (jamais la date
@@ -157,8 +174,8 @@ export type SlotValidationResult =
 
 // "HH:mm", heures 00-23, minutes 00-59 -- zéro-paddé pour que la comparaison
 // lexicographique (utilisée pour le tri et la comparaison fin > début) soit
-// correcte. Exportée : actions/homework.ts valide `plannedStartTime` avec ce
-// même motif plutôt que d'en dupliquer une copie (corrigé en revue).
+// correcte. Exportée : actions/homework.ts valide `echeanceTime` avec ce même
+// motif plutôt que d'en dupliquer une copie (corrigé en revue).
 export const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 /**

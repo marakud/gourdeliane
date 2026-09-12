@@ -3,7 +3,7 @@ import {
   classifyTaskView,
   computeDaysRemaining,
   computeEstimatedWorkload,
-  filterDevoirsForWeekday,
+  filterDevoirsForDate,
   formatEstimatedDuration,
   TASK_VIEW_DONE,
   TASK_VIEW_LATER,
@@ -31,76 +31,91 @@ describe("computeDaysRemaining (spec 2.4 amendment I/O matrix)", () => {
   });
 });
 
-describe("filterDevoirsForWeekday (spec 2.4 amendment -- retour utilisateur, disponibilité EDT)", () => {
+describe("filterDevoirsForDate (évolution CartableFlow -- calendrier unifié)", () => {
   const maths = { name: "Maths", colorIndex: 1 };
 
-  it("keeps only devoirs planned for the given weekday", () => {
+  it("keeps only devoirs whose échéance is the given date, with a precise time", () => {
     const devoirs = [
       {
         id: "d1",
         description: "Lundi",
         done: false,
-        plannedWeekday: "MONDAY",
-        plannedStartTime: "16:00",
+        echeanceIso: "2026-09-14",
+        echeanceTime: "16:00",
         subject: maths,
       },
       {
         id: "d2",
         description: "Mardi",
         done: false,
-        plannedWeekday: "TUESDAY",
-        plannedStartTime: "16:00",
+        echeanceIso: "2026-09-15",
+        echeanceTime: "16:00",
         subject: maths,
       },
     ];
 
-    const result = filterDevoirsForWeekday(devoirs, "MONDAY");
+    const result = filterDevoirsForDate(devoirs, "2026-09-14");
 
     expect(result.map((d) => d.id)).toEqual(["d1"]);
   });
 
-  it("excludes an unplanned devoir (no plannedWeekday) regardless of weekday", () => {
+  it("excludes a devoir with no precise time (echeanceTime null), even on a matching date", () => {
     const devoirs = [
       {
         id: "d1",
-        description: "Pas programmé",
+        description: "Échéance sans heure",
         done: false,
-        plannedWeekday: null,
-        plannedStartTime: null,
+        echeanceIso: "2026-09-14",
+        echeanceTime: null,
         subject: maths,
       },
     ];
 
-    expect(filterDevoirsForWeekday(devoirs, "MONDAY")).toEqual([]);
+    expect(filterDevoirsForDate(devoirs, "2026-09-14")).toEqual([]);
   });
 
-  it("sorts multiple devoirs planned the same day by start time", () => {
+  it("excludes a devoir with no échéance at all", () => {
+    const devoirs = [
+      {
+        id: "d1",
+        description: "Pas d'échéance",
+        done: false,
+        echeanceIso: null,
+        echeanceTime: null,
+        subject: maths,
+      },
+    ];
+
+    expect(filterDevoirsForDate(devoirs, "2026-09-14")).toEqual([]);
+  });
+
+  it("sorts multiple devoirs on the same date by start time", () => {
     const devoirs = [
       {
         id: "d1",
         description: "Plus tard",
         done: false,
-        plannedWeekday: "MONDAY",
-        plannedStartTime: "18:00",
+        echeanceIso: "2026-09-14",
+        echeanceTime: "18:00",
         subject: maths,
       },
       {
         id: "d2",
         description: "Plus tôt",
         done: false,
-        plannedWeekday: "MONDAY",
-        plannedStartTime: "09:00",
+        echeanceIso: "2026-09-14",
+        echeanceTime: "09:00",
         subject: maths,
       },
     ];
 
-    const result = filterDevoirsForWeekday(devoirs, "MONDAY");
+    const result = filterDevoirsForDate(devoirs, "2026-09-14");
 
     expect(result.map((d) => d.id)).toEqual(["d2", "d1"]);
   });
 
-  it("returns an empty array when no devoir is planned for that day", () => {
-    expect(filterDevoirsForWeekday([], "SUNDAY")).toEqual([]);
+  it("returns an empty array when no devoir matches that date", () => {
+    expect(filterDevoirsForDate([], "2026-09-14")).toEqual([]);
   });
 
   it("preserves each devoir's own done state and subject", () => {
@@ -109,13 +124,13 @@ describe("filterDevoirsForWeekday (spec 2.4 amendment -- retour utilisateur, dis
         id: "d1",
         description: "Fait",
         done: true,
-        plannedWeekday: "MONDAY",
-        plannedStartTime: "16:00",
+        echeanceIso: "2026-09-14",
+        echeanceTime: "16:00",
         subject: maths,
       },
     ];
 
-    const result = filterDevoirsForWeekday(devoirs, "MONDAY");
+    const result = filterDevoirsForDate(devoirs, "2026-09-14");
 
     expect(result[0]).toEqual({
       id: "d1",

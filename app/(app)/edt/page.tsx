@@ -5,7 +5,7 @@ import { listDevoirs } from "@/data/homework";
 import { EdtViewTabs } from "@/components/schedule/edt-view-tabs";
 import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
 import { computeWeekParity, deriveDaySlots, type WeekParity, type Weekday } from "@/domain/schedule";
-import { filterDevoirsForWeekday } from "@/domain/homework";
+import { filterDevoirsForDate } from "@/domain/homework";
 import {
   getTodaySchoolDate,
   getTomorrowSchoolDate,
@@ -87,16 +87,19 @@ export default async function EdtPage() {
     tomorrowParity
   );
 
-  // Devoirs programmés dans un trou libre (Story 2.4, retour utilisateur
-  // "programmer le devoir dans l'EDT" -- disponibilité réelle, pas un
-  // rattachement à un cours) : affichage en lecture seule dans
-  // "Aujourd'hui"/"Demain" -- cocher/supprimer reste réservé au bloc
-  // "Devoirs" d'Accueil (Code Map). Indépendant de `noSchoolDayIsoSet` : un
-  // jour "sans cours" n'annule pas le temps personnel que l'enfant s'est
-  // programmé ce jour-là.
+  // Devoirs dont l'échéance (calendrier unifié, évolution CartableFlow) tombe
+  // précisément aujourd'hui/demain ET porte une heure précise : affichage en
+  // lecture seule dans "Aujourd'hui"/"Demain" -- cocher/supprimer reste
+  // réservé au bloc "Devoirs" d'Accueil (Code Map). Indépendant de
+  // `noSchoolDayIsoSet` : un jour "sans cours" n'annule pas le temps
+  // personnel que l'enfant s'est programmé ce jour-là.
   const devoirs = await listDevoirs(user.id);
-  const todayPlannedDevoirs = filterDevoirsForWeekday(devoirs, todayWeekday);
-  const tomorrowPlannedDevoirs = filterDevoirsForWeekday(devoirs, tomorrowWeekday);
+  const devoirsWithEcheanceIso = devoirs.map((devoir) => ({
+    ...devoir,
+    echeanceIso: devoir.echeance ? devoir.echeance.toISOString().slice(0, 10) : null,
+  }));
+  const todayPlannedDevoirs = filterDevoirsForDate(devoirsWithEcheanceIso, todayIso);
+  const tomorrowPlannedDevoirs = filterDevoirsForDate(devoirsWithEcheanceIso, tomorrowIso);
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-8">

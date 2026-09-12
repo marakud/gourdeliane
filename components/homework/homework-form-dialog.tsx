@@ -25,10 +25,7 @@ import {
   updateDevoirAction,
   type DevoirFormInput,
 } from "@/actions/homework";
-import {
-  FreeTimePicker,
-  type FreeTimePickerValue,
-} from "@/components/homework/free-time-picker";
+import { EcheancePicker } from "@/components/homework/echeance-picker";
 import { computeWeeklyFreeGaps, type Weekday } from "@/domain/schedule";
 import { MAX_ESTIMATED_MINUTES } from "@/domain/homework";
 
@@ -55,8 +52,7 @@ export interface HomeworkFormDialogDevoir {
   description: string;
   aRendre: boolean;
   echeance: string; // ISO "yyyy-MM-dd", "" si aucune
-  plannedWeekday: string; // code Weekday, "" si non programmé
-  plannedStartTime: string; // "HH:mm", "" si non programmé
+  echeanceTime: string; // "HH:mm", "" si aucune heure précise
   estimatedMinutes: number | null;
 }
 
@@ -112,8 +108,7 @@ const EMPTY_FORM: DevoirFormInput = {
   description: "",
   aRendre: false,
   echeance: "",
-  plannedWeekday: "",
-  plannedStartTime: "",
+  echeanceTime: "",
 };
 
 function toFormInput(
@@ -128,8 +123,7 @@ function toFormInput(
     description: devoir.description,
     aRendre: devoir.aRendre,
     echeance: devoir.echeance,
-    plannedWeekday: devoir.plannedWeekday,
-    plannedStartTime: devoir.plannedStartTime,
+    echeanceTime: devoir.echeanceTime,
     estimatedMinutes: devoir.estimatedMinutes ?? undefined,
   };
 }
@@ -162,13 +156,6 @@ export function HomeworkFormDialog({
     () => computeWeeklyFreeGaps(scheduleSlots),
     [scheduleSlots]
   );
-  const plannedValue: FreeTimePickerValue | null =
-    form.plannedWeekday && form.plannedStartTime
-      ? {
-          weekday: form.plannedWeekday as Weekday,
-          startTime: form.plannedStartTime,
-        }
-      : null;
 
   function resetAndOpen(nextOpen: boolean) {
     setOpen(nextOpen);
@@ -333,33 +320,17 @@ export function HomeworkFormDialog({
             <span className="text-base text-foreground">À rendre</span>
           </label>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="devoir-echeance">Échéance (optionnel)</Label>
-            <Input
-              id="devoir-echeance"
-              type="date"
-              value={form.echeance ?? ""}
-              onChange={(e) =>
-                setForm((f) => ({ ...f, echeance: e.target.value }))
-              }
-              className="h-11 text-base"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label>Programmer dans l&apos;EDT (optionnel)</Label>
-            <FreeTimePicker
-              weeklyGaps={weeklyGaps}
-              value={plannedValue}
-              onChange={(next) =>
-                setForm((f) => ({
-                  ...f,
-                  plannedWeekday: next?.weekday ?? "",
-                  plannedStartTime: next?.startTime ?? "",
-                }))
-              }
-            />
-          </div>
+          <EcheancePicker
+            weeklyGaps={weeklyGaps}
+            value={{ dateIso: form.echeance ?? "", time: form.echeanceTime ?? "" }}
+            onChange={(next) =>
+              setForm((f) => ({
+                ...f,
+                echeance: next.dateIso,
+                echeanceTime: next.time,
+              }))
+            }
+          />
 
           {error && (
             <p role="alert" className="text-sm font-medium text-destructive">

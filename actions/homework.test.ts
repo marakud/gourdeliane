@@ -71,8 +71,7 @@ describe("createDevoirAction -- création minimale (spec 2.4 I/O matrix)", () =>
     expect(devoir?.aRendre).toBe(false);
     expect(devoir?.echeance).toBeNull();
     expect(devoir?.done).toBe(false);
-    expect(devoir?.plannedWeekday).toBeNull();
-    expect(devoir?.plannedStartTime).toBeNull();
+    expect(devoir?.echeanceTime).toBeNull();
   });
 
   it("accepte aRendre + echeance quand fournis", async () => {
@@ -93,54 +92,31 @@ describe("createDevoirAction -- création minimale (spec 2.4 I/O matrix)", () =>
     expect(devoir?.echeance?.toISOString().slice(0, 10)).toBe("2026-12-20");
   });
 
-  it("accepte un placement (jour + heure) dans un trou libre de l'EDT (retour utilisateur Story 2.4)", async () => {
+  it("accepte une échéance avec heure précise (calendrier unifié, évolution CartableFlow)", async () => {
     await ensureTestSubject();
 
     const result = await createDevoirAction({
       subjectId,
       description: "action-test-devoir-planned",
-      plannedWeekday: "THURSDAY",
-      plannedStartTime: "16:00",
+      echeance: "2026-12-17", // un jeudi
+      echeanceTime: "16:00",
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
     const devoir = await prisma.devoir.findUnique({ where: { id: result.data.id } });
-    expect(devoir?.plannedWeekday).toBe("THURSDAY");
-    expect(devoir?.plannedStartTime).toBe("16:00");
+    expect(devoir?.echeance?.toISOString().slice(0, 10)).toBe("2026-12-17");
+    expect(devoir?.echeanceTime).toBe("16:00");
   });
 
-  it("rejette un jour sans heure (créneau incomplet)", async () => {
+  it("rejette une heure sans échéance", async () => {
     await ensureTestSubject();
 
     const result = await createDevoirAction({
       subjectId,
-      description: "action-test-devoir-partial-plan-day",
-      plannedWeekday: "THURSDAY",
-    });
-    expect(result.ok).toBe(false);
-  });
-
-  it("rejette une heure sans jour (créneau incomplet)", async () => {
-    await ensureTestSubject();
-
-    const result = await createDevoirAction({
-      subjectId,
-      description: "action-test-devoir-partial-plan-time",
-      plannedStartTime: "16:00",
-    });
-    expect(result.ok).toBe(false);
-  });
-
-  it("rejette un jour de la semaine invalide", async () => {
-    await ensureTestSubject();
-
-    const result = await createDevoirAction({
-      subjectId,
-      description: "action-test-devoir-bad-weekday",
-      plannedWeekday: "SOMEDAY",
-      plannedStartTime: "16:00",
+      description: "action-test-devoir-time-without-echeance",
+      echeanceTime: "16:00",
     });
     expect(result.ok).toBe(false);
   });
@@ -151,8 +127,8 @@ describe("createDevoirAction -- création minimale (spec 2.4 I/O matrix)", () =>
     const result = await createDevoirAction({
       subjectId,
       description: "action-test-devoir-bad-time",
-      plannedWeekday: "THURSDAY",
-      plannedStartTime: "16h00",
+      echeance: "2026-12-17",
+      echeanceTime: "16h00",
     });
     expect(result.ok).toBe(false);
   });
@@ -327,16 +303,14 @@ describe("updateDevoirAction -- modification (retour utilisateur)", () => {
       description: "action-test-devoir-update-after",
       aRendre: true,
       echeance: "2026-12-20",
-      plannedWeekday: "THURSDAY",
-      plannedStartTime: "16:00",
+      echeanceTime: "16:00",
     });
     expect(updated.ok).toBe(true);
 
     const devoir = await prisma.devoir.findUnique({ where: { id: created.data.id } });
     expect(devoir?.description).toBe("action-test-devoir-update-after");
     expect(devoir?.aRendre).toBe(true);
-    expect(devoir?.plannedWeekday).toBe("THURSDAY");
-    expect(devoir?.plannedStartTime).toBe("16:00");
+    expect(devoir?.echeanceTime).toBe("16:00");
   });
 
   it("ne touche jamais à `done` (AD-7, réservé à toggleDevoirDoneAction)", async () => {

@@ -1,5 +1,4 @@
 import { prisma } from "./prisma";
-import type { Weekday } from "@/domain/schedule";
 import {
   DEVOIR_STATUS_DONE,
   DEVOIR_STATUS_IN_PROGRESS,
@@ -7,16 +6,15 @@ import {
 } from "@/domain/homework";
 
 // Story 2.4 (+ amendements retour utilisateur) -- accès aux données des
-// devoirs : création (avec placement optionnel dans un trou libre de l'EDT),
-// bascule "fait" (bidirectionnelle), suppression, listing. Toute logique de
-// dérivation vit dans domain/homework.ts, jamais ici.
+// devoirs : création, bascule "fait" (bidirectionnelle), suppression,
+// listing. Toute logique de dérivation vit dans domain/homework.ts, jamais
+// ici.
 
 /**
- * Crée un devoir. `aRendre`/`echeance`/`plannedWeekday`/`plannedStartTime`
- * restent optionnels (Boundaries spec 2.4 : seules matière + description
- * sont obligatoires, validées en amont par actions/homework.ts) -- `done`
- * démarre toujours à `false` (défaut du schéma), aucun devoir ne peut être
- * créé déjà fait.
+ * Crée un devoir. `aRendre`/`echeance`/`echeanceTime` restent optionnels
+ * (Boundaries spec 2.4 : seules matière + description sont obligatoires,
+ * validées en amont par actions/homework.ts) -- `done` démarre toujours à
+ * `false` (défaut du schéma), aucun devoir ne peut être créé déjà fait.
  */
 export async function createDevoir(
   userId: string,
@@ -24,8 +22,7 @@ export async function createDevoir(
   description: string,
   aRendre: boolean = false,
   echeance: Date | null = null,
-  plannedWeekday: Weekday | null = null,
-  plannedStartTime: string | null = null,
+  echeanceTime: string | null = null,
   estimatedMinutes: number | null = null
 ) {
   return prisma.devoir.create({
@@ -35,8 +32,7 @@ export async function createDevoir(
       description,
       aRendre,
       echeance,
-      plannedWeekday,
-      plannedStartTime,
+      echeanceTime,
       estimatedMinutes,
     },
     include: { subject: true },
@@ -57,8 +53,7 @@ export async function updateDevoir(
   description: string,
   aRendre: boolean,
   echeance: Date | null,
-  plannedWeekday: Weekday | null,
-  plannedStartTime: string | null,
+  echeanceTime: string | null,
   estimatedMinutes: number | null
 ) {
   return prisma.devoir.update({
@@ -68,8 +63,7 @@ export async function updateDevoir(
       description,
       aRendre,
       echeance,
-      plannedWeekday,
-      plannedStartTime,
+      echeanceTime,
       estimatedMinutes,
     },
     include: { subject: true },
