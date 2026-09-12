@@ -7,6 +7,26 @@
 
 import type { Weekday } from "./schedule";
 
+// Évolution CartableFlow (modèle de tâches enrichi) -- statut à 3 valeurs,
+// coexiste avec `done` (AD-7) plutôt que de le remplacer : `done` reste la
+// seule source de vérité pour le Sac du soir/streak/DevoirsList, `status`
+// est maintenu synchronisé à chaque écriture (actions/homework.ts,
+// data/homework.ts) et n'ajoute que l'état intermédiaire "En cours"
+// qu'aucun booléen ne peut représenter.
+export const DEVOIR_STATUS_TODO = "TODO" as const;
+export const DEVOIR_STATUS_IN_PROGRESS = "IN_PROGRESS" as const;
+export const DEVOIR_STATUS_DONE = "DONE" as const;
+
+export type DevoirStatus =
+  | typeof DEVOIR_STATUS_TODO
+  | typeof DEVOIR_STATUS_IN_PROGRESS
+  | typeof DEVOIR_STATUS_DONE;
+
+/** Durée estimée maximale acceptée (8h) -- garde-fou générique contre une
+ * saisie aberrante, pas une règle produit précise (aucune spec ne fixe ce
+ * chiffre ; repris comme ordre de grandeur raisonnable pour un devoir). */
+export const MAX_ESTIMATED_MINUTES = 480;
+
 /**
  * Nombre de jours calendaires entre `todayIso` et `echeanceIso` (positif si
  * l'échéance est à venir, 0 si aujourd'hui, négatif si dépassée). Les deux
@@ -33,6 +53,51 @@ export function computeDaysRemaining(
 function parseIsoDate(iso: string): [number, number, number] {
   const [year, month, day] = iso.split("-").map(Number);
   return [year, month - 1, day];
+}
+
+/** Un devoir pris en compte pour la charge estimée du jour (évolution
+ * CartableFlow) -- seuls les devoirs pas encore faits comptent (un devoir
+ * déjà fait n'est plus "du travail à faire"). */
+export interface DevoirWorkloadInput {
+  done: boolean;
+  estimatedMinutes: number | null;
+}
+
+export interface EstimatedWorkload {
+  totalMinutes: number;
+  /** Au moins un devoir restant a une durée estimée -- si `false`,
+   * l'appelant ne doit rien afficher : un total à 0 ne distinguerait sinon
+   * pas "rien à faire" de "aucune durée saisie sur les devoirs restants". */
+  hasEstimate: boolean;
+}
+
+/**
+ * Additionne la durée estimée des devoirs restants (pas encore faits, avec
+ * une estimation saisie). Ne présume jamais une durée pour un devoir sans
+ * estimation -- ni 0, ni une moyenne : ce devoir est simplement exclu du
+ * total (`hasEstimate` reste `true` tant qu'au moins un autre en a une).
+ */
+export function computeEstimatedWorkload(
+  devoirs: readonly DevoirWorkloadInput[]
+): EstimatedWorkload {
+  const remaining = devoirs.filter(
+    (devoir) => !devoir.done && devoir.estimatedMinutes !== null
+  );
+  const totalMinutes = remaining.reduce(
+    (sum, devoir) => sum + (devoir.estimatedMinutes ?? 0),
+    0
+  );
+  return { totalMinutes, hasEstimate: remaining.length > 0 };
+}
+
+/** Formate une durée en minutes pour l'affichage ("30 min", "1 h", "1 h 10")
+ * -- jamais de décimal, toujours arrondi à la minute (l'unité déjà saisie). */
+export function formatEstimatedDuration(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (remainder === 0) return `${hours} h`;
+  return `${hours} h ${String(remainder).padStart(2, "0")}`;
 }
 
 /** Un devoir programmé pour un jour donné (Story 2.4, retour utilisateur

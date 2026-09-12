@@ -1,5 +1,10 @@
 import { prisma } from "./prisma";
 import type { Weekday } from "@/domain/schedule";
+import {
+  DEVOIR_STATUS_DONE,
+  DEVOIR_STATUS_IN_PROGRESS,
+  DEVOIR_STATUS_TODO,
+} from "@/domain/homework";
 
 // Story 2.4 (+ amendements retour utilisateur) -- accès aux données des
 // devoirs : création (avec placement optionnel dans un trou libre de l'EDT),
@@ -20,7 +25,8 @@ export async function createDevoir(
   aRendre: boolean = false,
   echeance: Date | null = null,
   plannedWeekday: Weekday | null = null,
-  plannedStartTime: string | null = null
+  plannedStartTime: string | null = null,
+  estimatedMinutes: number | null = null
 ) {
   return prisma.devoir.create({
     data: {
@@ -31,6 +37,7 @@ export async function createDevoir(
       echeance,
       plannedWeekday,
       plannedStartTime,
+      estimatedMinutes,
     },
     include: { subject: true },
   });
@@ -51,7 +58,8 @@ export async function updateDevoir(
   aRendre: boolean,
   echeance: Date | null,
   plannedWeekday: Weekday | null,
-  plannedStartTime: string | null
+  plannedStartTime: string | null,
+  estimatedMinutes: number | null
 ) {
   return prisma.devoir.update({
     where: { id, userId },
@@ -62,6 +70,7 @@ export async function updateDevoir(
       echeance,
       plannedWeekday,
       plannedStartTime,
+      estimatedMinutes,
     },
     include: { subject: true },
   });
@@ -80,10 +89,34 @@ export async function toggleDevoirDone(
   userId: string,
   done: boolean
 ) {
+  // `status` reste synchronisé avec `done` (AD-7 étendu) : fait -> DONE,
+  // redécoché -> TODO (jamais IN_PROGRESS -- décocher ne présume pas qu'un
+  // travail est réellement repris, cf. domain/homework.ts).
   return prisma.devoir.update({
     where: { id, userId },
-    data: { done },
+    data: {
+      done,
+      status: done ? DEVOIR_STATUS_DONE : DEVOIR_STATUS_TODO,
+    },
   });
+}
+
+/**
+ * Passe un devoir de TODO à IN_PROGRESS (bouton "Commencer", évolution
+ * CartableFlow) -- ne touche jamais `done`. `updateMany` scopé sur
+ * `status: TODO` plutôt qu'un read-then-write : idempotent (un devoir déjà
+ * IN_PROGRESS/DONE ne bascule pas une seconde fois), jamais de confiance
+ * aveugle dans ce que le client affichait au moment du tap.
+ */
+export async function startDevoir(
+  id: string,
+  userId: string
+): Promise<{ started: boolean }> {
+  const result = await prisma.devoir.updateMany({
+    where: { id, userId, status: DEVOIR_STATUS_TODO },
+    data: { status: DEVOIR_STATUS_IN_PROGRESS },
+  });
+  return { started: result.count > 0 };
 }
 
 /**

@@ -5,6 +5,7 @@ import { requireUserId } from "@/lib/current-user";
 import {
   createDevoir,
   deleteDevoir,
+  startDevoir,
   toggleDevoirDone,
   updateDevoir,
 } from "@/data/homework";
@@ -16,6 +17,7 @@ import {
   TIME_PATTERN,
   type Weekday,
 } from "@/domain/schedule";
+import { MAX_ESTIMATED_MINUTES } from "@/domain/homework";
 
 // Toute mutation des devoirs passe par ce fichier (AD-1). Chaque action
 // rappelle domain/homework.ts pour toute règle métier avant d'écrire via
@@ -83,6 +85,12 @@ export interface DevoirFormInput {
   // aucun des deux, jamais l'un sans l'autre.
   plannedWeekday?: string;
   plannedStartTime?: string; // "HH:mm"
+  // Durée estimée en minutes (évolution CartableFlow, facultative) --
+  // presets 10/15/20/30/45/60 ou une valeur personnalisée, saisie côté
+  // formulaire (HomeworkFormDialog) ; ce champ n'accepte ici qu'un entier
+  // positif borné (MAX_ESTIMATED_MINUTES), jamais une confiance aveugle
+  // dans ce que le sélecteur aurait dû empêcher.
+  estimatedMinutes?: number;
 }
 
 /**
@@ -122,6 +130,25 @@ interface ParsedDevoirInput {
   echeance: Date | null;
   plannedWeekday: Weekday | null;
   plannedStartTime: string | null;
+  estimatedMinutes: number | null;
+}
+
+/**
+ * Valide une durée estimée optionnelle. `undefined` -> `null` (pas
+ * renseignée, cas normal). Un nombre fourni doit être un entier strictement
+ * positif et rester sous `MAX_ESTIMATED_MINUTES` -- un `NaN`/négatif/décimal
+ * ne doit jamais s'écrire silencieusement en base.
+ */
+function parseEstimatedMinutes(
+  value: number | undefined
+): { ok: true; value: number | null } | { ok: false } {
+  if (value === undefined) {
+    return { ok: true, value: null };
+  }
+  if (!Number.isInteger(value) || value <= 0 || value > MAX_ESTIMATED_MINUTES) {
+    return { ok: false };
+  }
+  return { ok: true, value };
 }
 
 /**
@@ -148,6 +175,10 @@ function parseDevoirFormInput(
   const echeance = parseEcheance(input.echeance);
   if (!echeance.ok) {
     return { ok: false, error: "Date d'échéance invalide." };
+  }
+  const estimatedMinutes = parseEstimatedMinutes(input.estimatedMinutes);
+  if (!estimatedMinutes.ok) {
+    return { ok: false, error: "Durée estimée invalide." };
   }
 
   const rawWeekday = input.plannedWeekday?.trim() || "";
@@ -179,6 +210,7 @@ function parseDevoirFormInput(
       echeance: echeance.value,
       plannedWeekday: isWeekday(rawWeekday) ? rawWeekday : null,
       plannedStartTime: rawStartTime.length > 0 ? rawStartTime : null,
+      estimatedMinutes: estimatedMinutes.value,
     },
   };
 }
@@ -203,7 +235,8 @@ export async function createDevoirAction(
       parsed.value.aRendre,
       parsed.value.echeance,
       parsed.value.plannedWeekday,
-      parsed.value.plannedStartTime
+      parsed.value.plannedStartTime,
+      parsed.value.estimatedMinutes
     );
     revalidateAccueil();
     revalidateEdt();
@@ -242,7 +275,8 @@ export async function updateDevoirAction(
       parsed.value.aRendre,
       parsed.value.echeance,
       parsed.value.plannedWeekday,
-      parsed.value.plannedStartTime
+      parsed.value.plannedStartTime,
+      parsed.value.estimatedMinutes
     );
     revalidateAccueil();
     revalidateEdt();
@@ -291,6 +325,36 @@ export async function toggleDevoirDoneAction(
       ok: false,
       error: "Impossible de mettre à jour le devoir. Réessaie.",
     };
+  }
+}
+
+export interface StartDevoirInput {
+  id: string;
+}
+
+/**
+ * Passe un devoir en "En cours" (bouton "Commencer", évolution
+ * CartableFlow) -- ne touche jamais `done`/le statut d'un devoir déjà
+ * démarré ou fait (data/homework.ts::startDevoir, idempotent). `started:
+ * false` (devoir déjà IN_PROGRESS/DONE ou introuvable) reste `{ ok: true }`
+ * -- ce n'est pas une erreur utilisateur, juste un no-op silencieux.
+ */
+export async function startDevoirAction(
+  input: StartDevoirInput
+): Promise<ActionResult<{ started: boolean }>> {
+  if (input.id.trim().length === 0) {
+    return { ok: false, error: "Devoir invalide." };
+  }
+
+  try {
+    const userId = await requireUserId();
+    const result = await startDevoir(input.id, userId);
+    revalidateAccueil();
+    revalidateEdt();
+    return { ok: true, data: result };
+  } catch (error) {
+    console.error("startDevoirAction failed:", error);
+    return { ok: false, error: "Impossible de démarrer le devoir. Réessaie." };
   }
 }
 

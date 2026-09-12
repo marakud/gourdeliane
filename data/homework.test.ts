@@ -5,9 +5,15 @@ import {
   createDevoir,
   deleteDevoir,
   listDevoirs,
+  startDevoir,
   toggleDevoirDone,
   updateDevoir,
 } from "./homework";
+import {
+  DEVOIR_STATUS_DONE,
+  DEVOIR_STATUS_IN_PROGRESS,
+  DEVOIR_STATUS_TODO,
+} from "@/domain/homework";
 
 // Tests d'intégration contre la vraie base de dev (SQLite), même convention
 // que data/checklist.test.ts -- userId synthétique distinct pour ne pas
@@ -45,6 +51,23 @@ describe("createDevoir -- création minimale (spec 2.4 I/O matrix)", () => {
     expect(devoir.subjectId).toBe(subjectId);
     expect(devoir.plannedWeekday).toBeNull();
     expect(devoir.plannedStartTime).toBeNull();
+    expect(devoir.status).toBe(DEVOIR_STATUS_TODO);
+    expect(devoir.estimatedMinutes).toBeNull();
+  });
+
+  it("accepte une durée estimée quand fournie", async () => {
+    const devoir = await createDevoir(
+      TEST_USER_ID,
+      subjectId,
+      "Exos p.12 avec durée",
+      false,
+      null,
+      null,
+      null,
+      30
+    );
+
+    expect(devoir.estimatedMinutes).toBe(30);
   });
 
   it("accepte aRendre et echeance quand fournis", async () => {
@@ -84,6 +107,7 @@ describe("toggleDevoirDone -- bidirectionnel, scopé par (id, userId)", () => {
 
     const updated = await toggleDevoirDone(devoir.id, TEST_USER_ID, true);
     expect(updated.done).toBe(true);
+    expect(updated.status).toBe(DEVOIR_STATUS_DONE);
 
     const all = await listDevoirs(TEST_USER_ID);
     const persisted = all.find((d) => d.id === devoir.id);
@@ -91,12 +115,13 @@ describe("toggleDevoirDone -- bidirectionnel, scopé par (id, userId)", () => {
     expect(persisted?.done).toBe(true);
   });
 
-  it("peut redécocher un devoir déjà fait (retour utilisateur Story 2.4)", async () => {
+  it("peut redécocher un devoir déjà fait (retour utilisateur Story 2.4) -- status repasse à TODO", async () => {
     const devoir = await createDevoir(TEST_USER_ID, subjectId, "À redécocher");
     await toggleDevoirDone(devoir.id, TEST_USER_ID, true);
 
     const reverted = await toggleDevoirDone(devoir.id, TEST_USER_ID, false);
     expect(reverted.done).toBe(false);
+    expect(reverted.status).toBe(DEVOIR_STATUS_TODO);
   });
 
   it("rejette une mise à jour scopée à un autre userId (protection {id, userId})", async () => {
@@ -113,6 +138,49 @@ describe("toggleDevoirDone -- bidirectionnel, scopé par (id, userId)", () => {
   });
 });
 
+describe("startDevoir -- TODO -> IN_PROGRESS, idempotent (évolution CartableFlow)", () => {
+  it("passe un devoir TODO à IN_PROGRESS", async () => {
+    const devoir = await createDevoir(TEST_USER_ID, subjectId, "À commencer");
+    expect(devoir.status).toBe(DEVOIR_STATUS_TODO);
+
+    const result = await startDevoir(devoir.id, TEST_USER_ID);
+    expect(result.started).toBe(true);
+
+    const persisted = await prisma.devoir.findUnique({ where: { id: devoir.id } });
+    expect(persisted?.status).toBe(DEVOIR_STATUS_IN_PROGRESS);
+    expect(persisted?.done).toBe(false);
+  });
+
+  it("ne redémarre pas un devoir déjà IN_PROGRESS (idempotent, jamais une confiance aveugle dans le statut affiché côté client)", async () => {
+    const devoir = await createDevoir(TEST_USER_ID, subjectId, "Déjà en cours");
+    await startDevoir(devoir.id, TEST_USER_ID);
+
+    const second = await startDevoir(devoir.id, TEST_USER_ID);
+    expect(second.started).toBe(false);
+  });
+
+  it("ne redémarre pas un devoir déjà fait", async () => {
+    const devoir = await createDevoir(TEST_USER_ID, subjectId, "Déjà fait");
+    await toggleDevoirDone(devoir.id, TEST_USER_ID, true);
+
+    const result = await startDevoir(devoir.id, TEST_USER_ID);
+    expect(result.started).toBe(false);
+
+    const persisted = await prisma.devoir.findUnique({ where: { id: devoir.id } });
+    expect(persisted?.status).toBe(DEVOIR_STATUS_DONE);
+  });
+
+  it("rejette (started=false) une tentative scopée à un autre userId", async () => {
+    const devoir = await createDevoir(TEST_USER_ID, subjectId, "Protégé start");
+
+    const result = await startDevoir(devoir.id, "un-autre-utilisateur");
+    expect(result.started).toBe(false);
+
+    const persisted = await prisma.devoir.findUnique({ where: { id: devoir.id } });
+    expect(persisted?.status).toBe(DEVOIR_STATUS_TODO);
+  });
+});
+
 describe("updateDevoir -- modifie un devoir existant, scopé par (id, userId)", () => {
   it("modifie tous les champs d'un devoir existant", async () => {
     const devoir = await createDevoir(TEST_USER_ID, subjectId, "À modifier");
@@ -126,7 +194,8 @@ describe("updateDevoir -- modifie un devoir existant, scopé par (id, userId)", 
       true,
       echeance,
       "THURSDAY",
-      "16:00"
+      "16:00",
+      45
     );
 
     expect(updated.description).toBe("Description modifiée");
@@ -134,6 +203,7 @@ describe("updateDevoir -- modifie un devoir existant, scopé par (id, userId)", 
     expect(updated.echeance?.toISOString()).toBe(echeance.toISOString());
     expect(updated.plannedWeekday).toBe("THURSDAY");
     expect(updated.plannedStartTime).toBe("16:00");
+    expect(updated.estimatedMinutes).toBe(45);
   });
 
   it("ne touche jamais à `done` (AD-7, réservé à toggleDevoirDone)", async () => {
@@ -146,6 +216,7 @@ describe("updateDevoir -- modifie un devoir existant, scopé par (id, userId)", 
       subjectId,
       "Description modifiée sans toucher done",
       false,
+      null,
       null,
       null,
       null
@@ -164,6 +235,7 @@ describe("updateDevoir -- modifie un devoir existant, scopé par (id, userId)", 
         subjectId,
         "Modification non autorisée",
         false,
+        null,
         null,
         null,
         null

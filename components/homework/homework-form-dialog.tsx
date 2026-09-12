@@ -30,6 +30,7 @@ import {
   type FreeTimePickerValue,
 } from "@/components/homework/free-time-picker";
 import { computeWeeklyFreeGaps, type Weekday } from "@/domain/schedule";
+import { MAX_ESTIMATED_MINUTES } from "@/domain/homework";
 
 // Formulaire d'un devoir, factorisé pour être partagé entre la création
 // (AddHomeworkFab) et l'édition (retour utilisateur -- DevoirsList) --
@@ -56,6 +57,40 @@ export interface HomeworkFormDialogDevoir {
   echeance: string; // ISO "yyyy-MM-dd", "" si aucune
   plannedWeekday: string; // code Weekday, "" si non programmé
   plannedStartTime: string; // "HH:mm", "" si non programmé
+  estimatedMinutes: number | null;
+}
+
+// Évolution CartableFlow -- presets de durée estimée + option "Personnalisée"
+// (saisie libre, bornée par MAX_ESTIMATED_MINUTES). "Aucune" reste la valeur
+// par défaut : ce champ est facultatif (Boundaries -- ne freine jamais une
+// saisie rapide).
+const DURATION_PRESETS = [10, 15, 20, 30, 45, 60] as const;
+const DURATION_SELECT_NONE = "none";
+const DURATION_SELECT_CUSTOM = "custom";
+
+function isCustomDuration(estimatedMinutes: number | undefined): boolean {
+  return (
+    estimatedMinutes !== undefined &&
+    !(DURATION_PRESETS as readonly number[]).includes(estimatedMinutes)
+  );
+}
+
+/**
+ * Le champ Select seul ne peut pas distinguer "Aucune" de "Durée
+ * personnalisée en cours de saisie, encore vide" -- les deux se traduisent
+ * par `estimatedMinutes === undefined`. `customSelected` (état local du
+ * composant, pas dérivable de `form` seul) tranche explicitement.
+ */
+function durationSelectValue(
+  estimatedMinutes: number | undefined,
+  customSelected: boolean
+): string {
+  if (customSelected) return DURATION_SELECT_CUSTOM;
+  if (estimatedMinutes === undefined) return DURATION_SELECT_NONE;
+  if ((DURATION_PRESETS as readonly number[]).includes(estimatedMinutes)) {
+    return String(estimatedMinutes);
+  }
+  return DURATION_SELECT_CUSTOM;
 }
 
 export interface HomeworkFormDialogProps {
@@ -95,6 +130,7 @@ function toFormInput(
     echeance: devoir.echeance,
     plannedWeekday: devoir.plannedWeekday,
     plannedStartTime: devoir.plannedStartTime,
+    estimatedMinutes: devoir.estimatedMinutes ?? undefined,
   };
 }
 
@@ -109,6 +145,12 @@ export function HomeworkFormDialog({
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<DevoirFormInput>(
     toFormInput(devoir, subjects[0]?.id ?? "")
+  );
+  // Voir `durationSelectValue` -- distinct de `form.estimatedMinutes` car
+  // "Durée personnalisée" tout juste choisie et encore vide doit rester
+  // affichée comme telle, pas retomber sur "Aucune".
+  const [customDurationSelected, setCustomDurationSelected] = useState(() =>
+    isCustomDuration(toFormInput(devoir, subjects[0]?.id ?? "").estimatedMinutes)
   );
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -132,7 +174,9 @@ export function HomeworkFormDialog({
     setOpen(nextOpen);
     if (nextOpen) {
       setError(null);
-      setForm(toFormInput(devoir, subjects[0]?.id ?? ""));
+      const initial = toFormInput(devoir, subjects[0]?.id ?? "");
+      setForm(initial);
+      setCustomDurationSelected(isCustomDuration(initial.estimatedMinutes));
     }
   }
 
@@ -212,6 +256,65 @@ export function HomeworkFormDialog({
               }
               className="h-11 text-base"
             />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="devoir-duration">Durée estimée (optionnel)</Label>
+            <Select
+              value={durationSelectValue(form.estimatedMinutes, customDurationSelected)}
+              onValueChange={(value) => {
+                if (value === DURATION_SELECT_NONE) {
+                  setCustomDurationSelected(false);
+                  setForm((f) => ({ ...f, estimatedMinutes: undefined }));
+                } else if (value === DURATION_SELECT_CUSTOM) {
+                  setCustomDurationSelected(true);
+                  // Ne réinitialise pas une valeur personnalisée déjà saisie
+                  // (ex. l'enfant rouvre le sélecteur par erreur) -- seule une
+                  // valeur qui correspondrait à un preset serait ambiguë ici,
+                  // et n'arrive jamais par ce chemin (les presets ont leur
+                  // propre branche ci-dessous).
+                } else {
+                  setCustomDurationSelected(false);
+                  setForm((f) => ({ ...f, estimatedMinutes: Number(value) }));
+                }
+              }}
+            >
+              <SelectTrigger id="devoir-duration" className="h-11 w-full text-base">
+                <SelectValue>
+                  {(value: string | null) => {
+                    if (value === DURATION_SELECT_CUSTOM) return "Durée personnalisée";
+                    if (!value || value === DURATION_SELECT_NONE) return "Aucune";
+                    return value === "60" ? "1 heure" : `${value} minutes`;
+                  }}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={DURATION_SELECT_NONE}>Aucune</SelectItem>
+                {DURATION_PRESETS.map((minutes) => (
+                  <SelectItem key={minutes} value={String(minutes)}>
+                    {minutes === 60 ? "1 heure" : `${minutes} minutes`}
+                  </SelectItem>
+                ))}
+                <SelectItem value={DURATION_SELECT_CUSTOM}>Durée personnalisée</SelectItem>
+              </SelectContent>
+            </Select>
+            {customDurationSelected && (
+              <Input
+                type="number"
+                min={1}
+                max={MAX_ESTIMATED_MINUTES}
+                placeholder="Nombre de minutes"
+                value={form.estimatedMinutes ?? ""}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setForm((f) => ({
+                    ...f,
+                    estimatedMinutes: raw === "" ? undefined : Number(raw),
+                  }));
+                }}
+                className="h-11 text-base"
+              />
+            )}
           </div>
 
           <label

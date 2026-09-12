@@ -4,9 +4,11 @@ import { prisma } from "../data/prisma";
 import {
   createDevoirAction,
   deleteDevoirAction,
+  startDevoirAction,
   toggleDevoirDoneAction,
   updateDevoirAction,
 } from "./homework";
+import { DEVOIR_STATUS_DONE, DEVOIR_STATUS_IN_PROGRESS } from "@/domain/homework";
 
 // Tests d'intégration contre la vraie base de dev (SQLite). Comme
 // actions/checklist.test.ts, ces actions résolvent l'utilisateur depuis la
@@ -191,6 +193,34 @@ describe("createDevoirAction -- création minimale (spec 2.4 I/O matrix)", () =>
     });
     expect(result.ok).toBe(false);
   });
+
+  it("accepte une durée estimée valide", async () => {
+    await ensureTestSubject();
+
+    const result = await createDevoirAction({
+      subjectId,
+      description: "action-test-devoir-duration",
+      estimatedMinutes: 30,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const devoir = await prisma.devoir.findUnique({ where: { id: result.data.id } });
+    expect(devoir?.estimatedMinutes).toBe(30);
+  });
+
+  it("rejette une durée estimée non entière, négative ou hors bornes", async () => {
+    await ensureTestSubject();
+
+    for (const estimatedMinutes of [-5, 0, 1.5, 481]) {
+      const result = await createDevoirAction({
+        subjectId,
+        description: "action-test-devoir-bad-duration",
+        estimatedMinutes,
+      });
+      expect(result.ok).toBe(false);
+    }
+  });
 });
 
 describe("toggleDevoirDoneAction -- bidirectionnel, jamais supprimé (AD-7)", () => {
@@ -232,6 +262,51 @@ describe("toggleDevoirDoneAction -- bidirectionnel, jamais supprimé (AD-7)", ()
 
   it("rejette un id vide", async () => {
     const result = await toggleDevoirDoneAction({ id: "", done: true });
+    expect(result.ok).toBe(false);
+  });
+});
+
+describe("startDevoirAction -- bouton \"Commencer\" (évolution CartableFlow)", () => {
+  it("passe un devoir TODO à IN_PROGRESS", async () => {
+    await ensureTestSubject();
+
+    const created = await createDevoirAction({
+      subjectId,
+      description: "action-test-devoir-start",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    const started = await startDevoirAction({ id: created.data.id });
+    expect(started.ok).toBe(true);
+    if (started.ok) expect(started.data.started).toBe(true);
+
+    const devoir = await prisma.devoir.findUnique({ where: { id: created.data.id } });
+    expect(devoir?.status).toBe(DEVOIR_STATUS_IN_PROGRESS);
+  });
+
+  it("ne redémarre pas un devoir déjà fait (started=false, pas une erreur)", async () => {
+    await ensureTestSubject();
+
+    const created = await createDevoirAction({
+      subjectId,
+      description: "action-test-devoir-start-done",
+    });
+    expect(created.ok).toBe(true);
+    if (!created.ok) return;
+
+    await toggleDevoirDoneAction({ id: created.data.id, done: true });
+
+    const started = await startDevoirAction({ id: created.data.id });
+    expect(started.ok).toBe(true);
+    if (started.ok) expect(started.data.started).toBe(false);
+
+    const devoir = await prisma.devoir.findUnique({ where: { id: created.data.id } });
+    expect(devoir?.status).toBe(DEVOIR_STATUS_DONE);
+  });
+
+  it("rejette un id vide", async () => {
+    const result = await startDevoirAction({ id: "" });
     expect(result.ok).toBe(false);
   });
 });

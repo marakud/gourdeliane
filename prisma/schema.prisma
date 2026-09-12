@@ -253,6 +253,16 @@ model Devoir {
   plannedWeekday   Weekday?
   plannedStartTime String?
 
+  // Évolution CartableFlow (modèle de tâches enrichi) -- `status` ("TODO"/
+  // "IN_PROGRESS"/"DONE", domain/homework.ts) coexiste avec `done` plutôt
+  // que de le remplacer : `done` reste la seule source de vérité pour tout
+  // ce qui en dépend déjà (Sac du soir, streak, DevoirsList -- AD-7), les
+  // deux sont maintenus synchronisés à chaque écriture
+  // (actions/homework.ts). `estimatedMinutes` (facultatif) alimente
+  // l'affichage de la charge du jour, jamais une valeur inventée si absente.
+  status           String @default("TODO")
+  estimatedMinutes Int?
+
   @@index([userId, done])
 }
 

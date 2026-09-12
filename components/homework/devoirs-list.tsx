@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, Pencil, Sparkles, Trash2 } from "lucide-react";
+import { Check, Pencil, Play, Sparkles, Trash2 } from "lucide-react";
 import type { ActionResult } from "@/actions/homework";
 import { SubjectTag } from "@/components/schedule/subject-tag";
 import {
@@ -10,6 +10,14 @@ import {
   type HomeworkFormDialogSubject,
 } from "@/components/homework/homework-form-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
+import {
+  computeEstimatedWorkload,
+  formatEstimatedDuration,
+  DEVOIR_STATUS_DONE,
+  DEVOIR_STATUS_IN_PROGRESS,
+  DEVOIR_STATUS_TODO,
+  type DevoirStatus,
+} from "@/domain/homework";
 import { cn } from "@/lib/utils";
 
 // Bloc "Devoirs" (Accueil, Story 2.4 -- retour utilisateur : contrairement à
@@ -24,6 +32,8 @@ export interface DevoirView {
   description: string;
   done: boolean;
   aRendre: boolean;
+  status: DevoirStatus;
+  estimatedMinutes: number | null;
   subject: { id: string; name: string; colorIndex: number };
   // Formatés côté serveur (app/(accueil)/page.tsx, AD-4) -- ce composant
   // n'a jamais à recalculer une date lui-même.
@@ -49,10 +59,15 @@ export type DeleteDevoirAction = (input: {
   id: string;
 }) => Promise<ActionResult<null>>;
 
+export type StartDevoirAction = (input: {
+  id: string;
+}) => Promise<ActionResult<{ started: boolean }>>;
+
 export interface DevoirsListProps {
   devoirs: DevoirView[];
   onToggle: ToggleDevoirDoneAction;
   onDelete: DeleteDevoirAction;
+  onStart: StartDevoirAction;
   // Nécessaires pour le formulaire d'édition (retour utilisateur) -- mêmes
   // données que celles déjà passées à AddHomeworkFab.
   subjects: HomeworkFormDialogSubject[];
@@ -73,10 +88,17 @@ function doneMapFrom(devoirs: readonly { id: string; done: boolean }[]) {
   return map;
 }
 
+function statusMapFrom(devoirs: readonly { id: string; status: DevoirStatus }[]) {
+  const map: Record<string, DevoirStatus> = {};
+  for (const devoir of devoirs) map[devoir.id] = devoir.status;
+  return map;
+}
+
 export function DevoirsList({
   devoirs,
   onToggle,
   onDelete,
+  onStart,
   subjects,
   scheduleSlots = [],
 }: DevoirsListProps) {
@@ -84,6 +106,11 @@ export function DevoirsList({
   // les props puis mis à jour localement au tap, avant la réponse serveur.
   const [doneById, setDoneById] = useState<Record<string, boolean>>(() =>
     doneMapFrom(devoirs)
+  );
+  // Même principe pour le statut (évolution CartableFlow, bouton
+  // "Commencer") -- optimiste, resynchronisé avec `doneById` ci-dessous.
+  const [statusById, setStatusById] = useState<Record<string, DevoirStatus>>(
+    () => statusMapFrom(devoirs)
   );
   // Reseynchronise depuis les props à chaque nouvelle donnée serveur (ex.
   // après une revalidation déclenchée ailleurs) -- sans ceci, une valeur
@@ -98,6 +125,7 @@ export function DevoirsList({
   if (devoirs !== prevDevoirs) {
     setPrevDevoirs(devoirs);
     setDoneById(doneMapFrom(devoirs));
+    setStatusById(statusMapFrom(devoirs));
   }
   // Ids supprimés optimistiquement -- masqués du rendu même si la réponse
   // serveur n'est pas encore revenue.
@@ -136,14 +164,40 @@ export function DevoirsList({
     if (pendingIds.has(id)) return;
 
     const next = !doneById[id];
+    const prevStatus = statusById[id];
     clearError(id);
     setPending(id, true);
     setDoneById((prev) => ({ ...prev, [id]: next }));
+    // `status` reste synchronisé avec `done` (même règle que
+    // data/homework.ts::toggleDevoirDone -- coché -> DONE, décoché -> TODO).
+    setStatusById((prev) => ({
+      ...prev,
+      [id]: next ? DEVOIR_STATUS_DONE : DEVOIR_STATUS_TODO,
+    }));
 
     startTransition(async () => {
       const result = await onToggle({ id, done: next });
       if (!result.ok) {
         setDoneById((prev) => ({ ...prev, [id]: !next }));
+        setStatusById((prev) => ({ ...prev, [id]: prevStatus }));
+        addError(id);
+      }
+      setPending(id, false);
+    });
+  }
+
+  function handleStart(id: string) {
+    if (pendingIds.has(id)) return;
+    if (statusById[id] !== DEVOIR_STATUS_TODO) return;
+
+    clearError(id);
+    setPending(id, true);
+    setStatusById((prev) => ({ ...prev, [id]: DEVOIR_STATUS_IN_PROGRESS }));
+
+    startTransition(async () => {
+      const result = await onStart({ id });
+      if (!result.ok) {
+        setStatusById((prev) => ({ ...prev, [id]: DEVOIR_STATUS_TODO }));
         addError(id);
       }
       setPending(id, false);
@@ -173,6 +227,15 @@ export function DevoirsList({
 
   const visibleDevoirs = devoirs.filter((devoir) => !deletedIds.has(devoir.id));
   const doneCount = visibleDevoirs.filter((devoir) => doneById[devoir.id]).length;
+  // Charge estimée -- reflète l'état optimiste (doneById), pas devoir.done
+  // brut, pour que cocher/décocher mette à jour le total sans attendre la
+  // réponse serveur (comme le reste de cette liste).
+  const workload = computeEstimatedWorkload(
+    visibleDevoirs.map((devoir) => ({
+      done: doneById[devoir.id] ?? devoir.done,
+      estimatedMinutes: devoir.estimatedMinutes,
+    }))
+  );
 
   return (
     <div className="flex flex-col gap-4">
@@ -186,6 +249,17 @@ export function DevoirsList({
           </span>
         )}
       </div>
+
+      {/* Évolution CartableFlow -- jamais présentée comme une durée
+          certaine ("environ"), et seulement si au moins un devoir restant a
+          une estimation (sinon "environ 0 min" laisserait croire à tort
+          qu'aucun devoir ne prend de temps). */}
+      {workload.hasEstimate && (
+        <p className="text-sm text-muted-foreground">
+          Tu as environ {formatEstimatedDuration(workload.totalMinutes)} de
+          travail restant.
+        </p>
+      )}
 
       {visibleDevoirs.length === 0 ? (
         // Refonte visuelle étape 6 -- `Sparkles`, même icône que
@@ -202,6 +276,8 @@ export function DevoirsList({
         <ul className="flex flex-col gap-1.5">
           {visibleDevoirs.map((devoir) => {
             const checked = doneById[devoir.id] ?? devoir.done;
+            const status = statusById[devoir.id] ?? devoir.status;
+            const inProgress = status === DEVOIR_STATUS_IN_PROGRESS && !checked;
             return (
               <li key={devoir.id} className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
@@ -242,6 +318,9 @@ export function DevoirsList({
                       </span>
                       <span className="text-sm text-muted-foreground">
                         {devoir.subject.name}
+                        {devoir.estimatedMinutes !== null && (
+                          <> · Prévu : {formatEstimatedDuration(devoir.estimatedMinutes)}</>
+                        )}
                         {devoir.echeanceLabel && devoir.daysRemaining !== null && (
                           <> · Échéance : {devoir.echeanceLabel} ({daysRemainingLabel(devoir.daysRemaining)})</>
                         )}
@@ -251,9 +330,26 @@ export function DevoirsList({
                             · {devoir.planned.weekday} {devoir.planned.startTime}
                           </>
                         )}
+                        {inProgress && (
+                          <>
+                            {" "}
+                            · <span className="font-semibold text-primary">En cours</span>
+                          </>
+                        )}
                       </span>
                     </div>
                   </button>
+                  {!checked && status === DEVOIR_STATUS_TODO && (
+                    <button
+                      type="button"
+                      onClick={() => handleStart(devoir.id)}
+                      disabled={pendingIds.has(devoir.id)}
+                      aria-label={`Commencer ${devoir.description}`}
+                      className="flex size-11 shrink-0 items-center justify-center rounded-xl text-primary disabled:opacity-60"
+                    >
+                      <Play aria-hidden="true" className="size-4" />
+                    </button>
+                  )}
                   <HomeworkFormDialog
                     trigger={
                       <button
@@ -276,6 +372,7 @@ export function DevoirsList({
                       echeance: devoir.echeanceIso ?? "",
                       plannedWeekday: devoir.plannedRaw?.weekday ?? "",
                       plannedStartTime: devoir.plannedRaw?.startTime ?? "",
+                      estimatedMinutes: devoir.estimatedMinutes,
                     }}
                   />
                   <button

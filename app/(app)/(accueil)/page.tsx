@@ -49,7 +49,12 @@ import {
   toggleRetourChecklistItem,
   toggleRevisionsChecklistItem,
 } from "@/actions/checklist";
-import { deleteDevoirAction, toggleDevoirDoneAction } from "@/actions/homework";
+import {
+  deleteDevoirAction,
+  startDevoirAction,
+  toggleDevoirDoneAction,
+} from "@/actions/homework";
+import type { DevoirStatus } from "@/domain/homework";
 import { SacChecklist } from "@/components/checklist/sac-checklist";
 import { FixedChecklist } from "@/components/checklist/fixed-checklist";
 import { RevisionsChecklist } from "@/components/checklist/revisions-checklist";
@@ -325,6 +330,8 @@ export default async function AccueilPage() {
       description: devoir.description,
       done: devoir.done,
       aRendre: devoir.aRendre,
+      status: devoir.status as DevoirStatus,
+      estimatedMinutes: devoir.estimatedMinutes,
       subject: {
         id: devoir.subject.id,
         name: devoir.subject.name,
@@ -476,6 +483,7 @@ export default async function AccueilPage() {
                 devoirs={devoirsView}
                 onToggle={toggleDevoirDoneAction}
                 onDelete={deleteDevoirAction}
+                onStart={startDevoirAction}
                 subjects={homeworkSubjects}
                 scheduleSlots={slots}
               />
