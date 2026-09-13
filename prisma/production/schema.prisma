@@ -54,6 +54,7 @@ model User {
   devoirs                     Devoir[]
   dayCompletions              DayCompletion[]
   pushSubscriptions           PushSubscription[]
+  lessonLogs                  LessonLog[]
 }
 
 // Jour de la semaine d'un créneau récurrent.
@@ -92,6 +93,7 @@ model Subject {
   scheduleSlots ScheduleSlot[]
   items         SubjectItem[]
   devoirs       Devoir[]
+  lessonLogs    LessonLog[]
 
   // Une matière est réutilisée par son nom : deux créneaux sur "Maths"
   // partagent la même Subject, jamais une doublée.
@@ -270,6 +272,30 @@ model Devoir {
   estimatedMinutes Int?
 
   @@index([userId, done])
+}
+
+// "Cahier de texte" (évolution CartableFlow, retour utilisateur) : une entrée
+// = ce qui a été vu en cours pour une matière, un jour donné -- texte libre.
+// Sert de trace pour le suivi avec le professeur, et de base pour savoir quoi
+// revoir avant le prochain cours, une évaluation, ou le week-end (relecture
+// de la semaine passée). Distinct de "Révisions du jour"
+// (ChecklistItemState/CHECKLIST_TYPE_REVISIONS, domain/checklist.ts) : cette
+// dernière n'est qu'un simple rappel à cocher ("Revoir le cours de X"), sans
+// aucun contenu -- LessonLog est le contenu réel. `date` reste librement
+// modifiable (jamais figée à "aujourd'hui") pour pouvoir rattraper un jour
+// oublié, contrairement aux checklists quotidiennes (AD-3/AD-2).
+model LessonLog {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject  @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  date      DateTime
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
 }
 
 // Complétude persistée par jour scolaire et par moment (Story 2.7, AD-5) --

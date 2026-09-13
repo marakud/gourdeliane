@@ -2,15 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, ListChecks, TrendingUp } from "lucide-react";
+import { Home, CalendarDays, ListChecks, NotebookText, TrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Navigation basse (Accueil / Mes tâches / Emploi du temps / Progression).
-// Réglages est volontairement absent de cette barre (accessible ailleurs,
-// cf. app/reglages). "Mes tâches" (évolution CartableFlow) juste après
-// Accueil : hub central des devoirs, aussi central au quotidien que
-// l'Accueil lui-même -- ListChecks plutôt qu'une nouvelle icône proche
-// (CalendarDays est déjà pris par l'EDT, éviter toute ambiguïté visuelle).
+// Navigation basse (Accueil / Mes tâches / Emploi du temps / Cahier de texte
+// / Progression). Réglages est volontairement absent de cette barre
+// (accessible ailleurs, cf. app/reglages). "Mes tâches" (évolution
+// CartableFlow) juste après Accueil : hub central des devoirs, aussi central
+// au quotidien que l'Accueil lui-même -- ListChecks plutôt qu'une nouvelle
+// icône proche (CalendarDays est déjà pris par l'EDT, éviter toute
+// ambiguïté visuelle). "Cahier de texte" (évolution CartableFlow, retour
+// utilisateur) -- NotebookText, distincte de NotebookPen (déjà utilisée pour
+// un devoir programmé dans l'EDT, components/schedule/day-view.tsx -- concept
+// différent, jamais la même icône pour deux notions différentes).
 const TABS = [
   { href: "/", label: "Accueil", fullLabel: "Accueil", icon: Home },
   {
@@ -24,6 +28,12 @@ const TABS = [
     label: "EDT",
     fullLabel: "Emploi du temps",
     icon: CalendarDays,
+  },
+  {
+    href: "/cahier-de-texte",
+    label: "Cahier",
+    fullLabel: "Cahier de texte",
+    icon: NotebookText,
   },
   {
     href: "/progression",
