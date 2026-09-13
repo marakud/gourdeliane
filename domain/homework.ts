@@ -26,9 +26,12 @@ export type DevoirStatus =
 export const MAX_ESTIMATED_MINUTES = 480;
 
 /**
- * Nombre de jours calendaires entre `todayIso` et `echeanceIso` (positif si
- * l'échéance est à venir, 0 si aujourd'hui, négatif si dépassée). Les deux
- * dates sont des chaînes "yyyy-MM-dd" (même format que
+ * Nombre de jours calendaires entre `todayIso` et `dateIso` (positif si la
+ * date est à venir, 0 si aujourd'hui, négatif si dépassée). Générique --
+ * utilisée aussi bien pour l'échéance (date de rendu fixée par l'école) que
+ * pour la date de planification (retour utilisateur : quand l'élève prévoit
+ * de faire le devoir, distincte de l'échéance -- domain/homework.ts::toDevoirTaskView).
+ * Les deux dates sont des chaînes "yyyy-MM-dd" (même format que
  * domain/school-day.ts::schoolDateToIso) -- comparées via `Date.UTC` à minuit
  * (jamais l'heure locale du serveur), les deux opérandes ancrés de façon
  * identique donc sans risque de frontière DST malgré l'absence d'ancrage
@@ -36,16 +39,11 @@ export const MAX_ESTIMATED_MINUTES = 480;
  * de l'arithmétique de jour ; ici on ne fait qu'une soustraction entre deux
  * instants déjà résolus).
  */
-export function computeDaysRemaining(
-  echeanceIso: string,
-  todayIso: string
-): number {
-  const echeance = Date.UTC(
-    ...(parseIsoDate(echeanceIso) as [number, number, number])
-  );
+export function computeDaysRemaining(dateIso: string, todayIso: string): number {
+  const date = Date.UTC(...(parseIsoDate(dateIso) as [number, number, number]));
   const today = Date.UTC(...(parseIsoDate(todayIso) as [number, number, number]));
   const msPerDay = 24 * 60 * 60 * 1000;
-  return Math.round((echeance - today) / msPerDay);
+  return Math.round((date - today) / msPerDay);
 }
 
 function parseIsoDate(iso: string): [number, number, number] {
@@ -90,13 +88,9 @@ export function computeEstimatedWorkload(
 
 // Évolution CartableFlow -- page "Mes tâches" : 6 vues demandées
 // (Aujourd'hui/Demain/Cette semaine/Plus tard/En retard/Terminés). Un devoir
-// fait est toujours "DONE", quelle que soit son échéance (même un devoir en
-// retard mais fait n'est plus "en retard" -- Boundaries : "en retard" décrit
-// un travail non fait, pas un fait historique sur la date). Un devoir sans
-// échéance (`daysRemaining === null`) n'a sa place dans aucune des vues
-// datées (Aujourd'hui/Demain/Cette semaine/En retard exigent toutes une
-// date) -- rangé dans "Plus tard", la seule vue compatible avec "pas de date
-// précise".
+// fait est toujours "DONE", quelle que soit sa date -- même un devoir en
+// retard mais fait n'est plus "en retard" (Boundaries : "en retard" décrit un
+// travail non fait, pas un fait historique sur la date).
 export const TASK_VIEW_TODAY = "TODAY" as const;
 export const TASK_VIEW_TOMORROW = "TOMORROW" as const;
 export const TASK_VIEW_THIS_WEEK = "THIS_WEEK" as const;
@@ -120,33 +114,58 @@ export type TaskViewCategory =
 const THIS_WEEK_MAX_DAYS_REMAINING = 7;
 
 /**
- * Classe un devoir dans l'une des 6 vues, à partir de son statut fait/pas
- * fait et du nombre de jours avant son échéance déjà calculé par
- * `computeDaysRemaining` (`null` si aucune échéance) -- ne recalcule jamais
- * une date lui-même (AD-1, todayIso reste la responsabilité de l'appelant).
+ * Classe un devoir dans l'une des 6 vues de "Mes tâches" (évolution
+ * CartableFlow, retour utilisateur). Un devoir porte potentiellement DEUX
+ * dates distinctes et indépendantes (toDevoirTaskView, plus bas) :
+ * - l'échéance (`echeanceDaysRemaining`) : date de RENDU fixée par l'école ;
+ * - la planification (`planDaysRemaining`) : jour où l'ÉLÈVE prévoit de
+ *   s'y mettre, éventuellement bien avant l'échéance.
+ *
+ * Règles (retour utilisateur -- l'ancienne version de cette fonction n'avait
+ * qu'une seule date en entrée, fusionnant les deux à tort) :
+ * 1. "En retard" ne dépend QUE de l'échéance (un rendu manqué) -- jamais
+ *    d'une planification simplement non tenue (l'élève avait prévu de le
+ *    faire hier et ne l'a pas fait : ce n'est pas "en retard" tant que
+ *    l'échéance elle-même n'est pas dépassée), et prime sur tout le reste.
+ * 2. Sinon, la planification prime pour placer le devoir dans
+ *    Aujourd'hui/Demain/Cette semaine/Plus tard -- si l'élève a prévu de le
+ *    faire aujourd'hui, il doit apparaître dans "Aujourd'hui" même si
+ *    l'échéance réelle est plus lointaine. Sans planification, on retombe
+ *    sur l'échéance (comportement historique).
+ * 3. Une planification passée mais non "en retard" au sens de l'échéance
+ *    (ex. prévu hier, échéance dans 3 jours) retombe dans "Aujourd'hui" --
+ *    c'est un plan à rattraper, pas un rendu manqué.
+ *
+ * Ne recalcule jamais une date elle-même (AD-1, todayIso reste la
+ * responsabilité de l'appelant, `computeDaysRemaining`).
  */
 export function classifyTaskView(
   done: boolean,
-  daysRemaining: number | null
+  planDaysRemaining: number | null,
+  echeanceDaysRemaining: number | null
 ): TaskViewCategory {
   if (done) return TASK_VIEW_DONE;
-  if (daysRemaining === null) return TASK_VIEW_LATER;
-  if (daysRemaining < 0) return TASK_VIEW_OVERDUE;
-  if (daysRemaining === 0) return TASK_VIEW_TODAY;
-  if (daysRemaining === 1) return TASK_VIEW_TOMORROW;
-  if (daysRemaining <= THIS_WEEK_MAX_DAYS_REMAINING) return TASK_VIEW_THIS_WEEK;
+  if (echeanceDaysRemaining !== null && echeanceDaysRemaining < 0) {
+    return TASK_VIEW_OVERDUE;
+  }
+
+  const effective = planDaysRemaining ?? echeanceDaysRemaining;
+  if (effective === null) return TASK_VIEW_LATER;
+  if (effective <= 0) return TASK_VIEW_TODAY;
+  if (effective === 1) return TASK_VIEW_TOMORROW;
+  if (effective <= THIS_WEEK_MAX_DAYS_REMAINING) return TASK_VIEW_THIS_WEEK;
   return TASK_VIEW_LATER;
 }
 
-/** Formate une échéance ISO "yyyy-MM-dd" en libellé court français (ex.
+/** Formate une date ISO "yyyy-MM-dd" en libellé court français (ex.
  * "20 déc.") -- ancrée à midi UTC pour éviter tout décalage de fuseau à
  * l'affichage, capitalisation manuelle de la seule première lettre (jamais
  * la classe Tailwind `capitalize`, qui capitaliserait chaque mot -- bug
- * corrigé en Story 1.3). Extraite de app/(accueil)/page.tsx (évolution
- * CartableFlow, page "Mes tâches") pour rester une seule définition,
- * partagée entre les deux écrans qui affichent une échéance. */
-export function formatEcheanceLabel(echeanceIso: string): string {
-  const date = new Date(`${echeanceIso}T12:00:00Z`);
+ * corrigé en Story 1.3). Générique (malgré son origine sur l'échéance) :
+ * réutilisée telle quelle pour la date de planification (évolution
+ * CartableFlow), jamais un second formateur dupliqué (AD-5). */
+export function formatDateLabel(dateIso: string): string {
+  const date = new Date(`${dateIso}T12:00:00Z`);
   const formatted = date.toLocaleDateString("fr-FR", {
     day: "numeric",
     month: "short",
@@ -154,8 +173,8 @@ export function formatEcheanceLabel(echeanceIso: string): string {
   return formatted.charAt(0).toUpperCase() + formatted.slice(1);
 }
 
-/** Devoir brut (déjà résolu par data/homework.ts::listDevoirs), échéance
- * déjà réduite à une chaîne ISO par l'appelant -- cette fonction ne touche
+/** Devoir brut (déjà résolu par data/homework.ts::listDevoirs), dates déjà
+ * réduites à des chaînes ISO par l'appelant -- cette fonction ne touche
  * jamais un objet `Date` (AD-1). */
 export interface DevoirTaskViewInput {
   id: string;
@@ -164,8 +183,15 @@ export interface DevoirTaskViewInput {
   aRendre: boolean;
   status: DevoirStatus;
   estimatedMinutes: number | null;
+  // Date de rendu fixée par l'école (retour utilisateur -- distincte de la
+  // planification ci-dessous).
   echeanceIso: string | null;
-  echeanceTime: string | null;
+  // Jour + heure où l'élève prévoit de faire le devoir (retour utilisateur --
+  // distinct de l'échéance : un devoir peut être prévu bien avant sa date de
+  // rendu). `planTime` n'a de sens qu'accompagné de `planDateIso`, jamais
+  // seul (validé par actions/homework.ts).
+  planDateIso: string | null;
+  planTime: string | null;
   subject: { id: string; name: string; colorIndex: number };
 }
 
@@ -182,25 +208,32 @@ export interface DevoirTaskView {
   estimatedMinutes: number | null;
   subject: { id: string; name: string; colorIndex: number };
   echeanceLabel: string | null;
-  echeanceTime: string | null;
-  daysRemaining: number | null;
+  echeanceDaysRemaining: number | null;
   echeanceIso: string | null;
+  planLabel: string | null;
+  planDaysRemaining: number | null;
+  planDateIso: string | null;
+  planTime: string | null;
   taskView: TaskViewCategory;
 }
 
 /**
- * Enrichit un devoir brut en vue prête à afficher -- échéance formatée,
- * jours restants, classification "Mes tâches". Fonction pure unique (AD-5) :
- * jamais dupliquée entre app/(app)/(accueil)/page.tsx et
- * app/(app)/mes-taches/page.tsx, qui affichent toutes deux des devoirs sous
- * cette même forme.
+ * Enrichit un devoir brut en vue prête à afficher -- échéance ET
+ * planification formatées séparément (jours restants, libellé), plus
+ * classification "Mes tâches" (`classifyTaskView`, qui combine les deux).
+ * Fonction pure unique (AD-5) : jamais dupliquée entre
+ * app/(app)/(accueil)/page.tsx et app/(app)/mes-taches/page.tsx, qui
+ * affichent toutes deux des devoirs sous cette même forme.
  */
 export function toDevoirTaskView(
   devoir: DevoirTaskViewInput,
   todayIso: string
 ): DevoirTaskView {
-  const daysRemaining = devoir.echeanceIso
+  const echeanceDaysRemaining = devoir.echeanceIso
     ? computeDaysRemaining(devoir.echeanceIso, todayIso)
+    : null;
+  const planDaysRemaining = devoir.planDateIso
+    ? computeDaysRemaining(devoir.planDateIso, todayIso)
     : null;
 
   return {
@@ -211,16 +244,17 @@ export function toDevoirTaskView(
     status: devoir.status,
     estimatedMinutes: devoir.estimatedMinutes,
     subject: devoir.subject,
-    echeanceLabel: devoir.echeanceIso
-      ? formatEcheanceLabel(devoir.echeanceIso)
-      : null,
-    // Une heure sans échéance n'a pas de sens (actions/homework.ts le
-    // rejette à l'écriture) -- au cas où une ligne historique en aurait
-    // quand même une (ex. donnée migrée), on ne l'affiche jamais seule.
-    echeanceTime: devoir.echeanceIso ? devoir.echeanceTime : null,
-    daysRemaining,
+    echeanceLabel: devoir.echeanceIso ? formatDateLabel(devoir.echeanceIso) : null,
+    echeanceDaysRemaining,
     echeanceIso: devoir.echeanceIso,
-    taskView: classifyTaskView(devoir.done, daysRemaining),
+    planLabel: devoir.planDateIso ? formatDateLabel(devoir.planDateIso) : null,
+    planDaysRemaining,
+    planDateIso: devoir.planDateIso,
+    // Une heure sans date de planification n'a pas de sens (actions/homework.ts
+    // le rejette à l'écriture) -- au cas où une ligne historique en aurait
+    // quand même une (ex. donnée migrée), on ne l'affiche jamais seule.
+    planTime: devoir.planDateIso ? devoir.planTime : null,
+    taskView: classifyTaskView(devoir.done, planDaysRemaining, echeanceDaysRemaining),
   };
 }
 
@@ -234,13 +268,12 @@ export function formatEstimatedDuration(minutes: number): string {
   return `${hours} h ${String(remainder).padStart(2, "0")}`;
 }
 
-/** Un devoir dont l'échéance tombe le jour affiché ET porte une heure
- * précise (évolution CartableFlow, calendrier unifié -- remplace l'ancien
- * placement `plannedWeekday`/`plannedStartTime`, indépendant de l'échéance)
- * -- projection minimale affichée en lecture seule dans la vue EDT du jour
- * concerné (components/schedule/day-view.tsx). Le nom du champ
- * `plannedStartTime` (plutôt que `echeanceTime`) est conservé tel quel : ce
- * type alimente `DayViewPlannedDevoir`, qui n'a pas besoin de changer.
+/** Un devoir dont la planification (pas l'échéance -- retour utilisateur)
+ * tombe le jour affiché ET porte une heure précise -- projection minimale
+ * affichée en lecture seule dans la vue EDT du jour concerné
+ * (components/schedule/day-view.tsx). Le nom du champ `plannedStartTime`
+ * (plutôt que `planTime`) est conservé tel quel : ce type alimente
+ * `DayViewPlannedDevoir`, qui n'a pas besoin de changer.
  */
 export interface PlannedDevoirView {
   id: string;
@@ -251,38 +284,36 @@ export interface PlannedDevoirView {
 }
 
 /**
- * Filtre les devoirs dont l'échéance exacte est `dateIso` ET qui portent une
- * heure précise, triés par heure. Pure : ne fait aucune requête, reçoit
- * `devoirs` déjà chargés par l'appelant (app/edt/page.tsx). Un devoir sans
- * heure (échéance seule, sans `echeanceTime`) n'apparaît jamais ici -- il a
- * déjà sa place dans "Devoirs"/"Mes tâches", cette carte ne montre que ce qui
- * est ancré à un moment précis du jour. Contrairement à l'ancien
- * `filterDevoirsForWeekday` (jour de semaine récurrent, sans année/mois/jour),
- * une correspondance par date exacte ne re-fait plus surface la semaine
- * suivante une fois la date passée.
+ * Filtre les devoirs dont la planification exacte est `dateIso` ET qui
+ * portent une heure précise, triés par heure. Pure : ne fait aucune requête,
+ * reçoit `devoirs` déjà chargés par l'appelant (app/edt/page.tsx). Regarde la
+ * planification, jamais l'échéance -- cette carte répond à "qu'est-ce que
+ * l'élève a prévu de faire aujourd'hui", pas "qu'est-ce qui est dû
+ * aujourd'hui" (déjà visible ailleurs, Accueil/"Mes tâches"). Un devoir sans
+ * heure (planifié un jour, sans heure précise) n'apparaît jamais ici.
  */
 export function filterDevoirsForDate(
   devoirs: readonly {
     id: string;
     description: string;
     done: boolean;
-    echeanceIso: string | null;
-    echeanceTime: string | null;
+    planDateIso: string | null;
+    planTime: string | null;
     subject: { name: string; colorIndex: number };
   }[],
   dateIso: string
 ): PlannedDevoirView[] {
   return devoirs
     .filter(
-      (devoir): devoir is typeof devoir & { echeanceTime: string } =>
-        devoir.echeanceIso === dateIso && devoir.echeanceTime !== null
+      (devoir): devoir is typeof devoir & { planTime: string } =>
+        devoir.planDateIso === dateIso && devoir.planTime !== null
     )
     .map((devoir) => ({
       id: devoir.id,
       description: devoir.description,
       done: devoir.done,
       subject: devoir.subject,
-      plannedStartTime: devoir.echeanceTime,
+      plannedStartTime: devoir.planTime,
     }))
     .sort((a, b) => a.plannedStartTime.localeCompare(b.plannedStartTime));
 }

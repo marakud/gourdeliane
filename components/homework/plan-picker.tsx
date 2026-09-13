@@ -6,32 +6,32 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { weekdayOfIso, type FreeGap, type Weekday } from "@/domain/schedule";
 
-// Calendrier unifié du formulaire de devoir (évolution CartableFlow) --
-// remplace les deux anciens champs séparés et indépendants ("Échéance" en
-// simple date, "Programmer dans l'EDT" en jour de semaine récurrent sans
-// date réelle) : retour utilisateur -- un devoir "programmé samedi 11h" via
-// l'ancien second champ n'apparaissait pas dans "Aujourd'hui" (page "Mes
-// tâches", qui ne classe que par échéance) et n'affichait jamais de date
-// réelle ("je ne vois pas les dates"). Ici, UNE seule date (vrai calendrier
-// natif du navigateur, aucune limite de fenêtre -- une échéance lointaine
-// reste possible, contrairement à une liste de jours proches) sert à la
-// fois d'échéance ET de placement dans l'EDT du jour concerné.
-// L'heure, une fois une date choisie, ne propose que les trous libres du
-// jour de semaine correspondant (mêmes `weeklyGaps` qu'avant,
-// domain/schedule.ts::computeWeeklyFreeGaps) -- toujours une heure sans
-// contrainte de date (l'alternance semaine A/B et les jours "sans cours" ne
-// sont pas pris en compte ici, même simplification assumée que l'ancien
-// sélecteur).
+// Calendrier de planification du formulaire de devoir (évolution
+// CartableFlow) -- distinct de l'Échéance (date de rendu fixée par l'école,
+// simple `<input type="date">` dans HomeworkFormDialog) : celui-ci répond à
+// "quand l'ÉLÈVE prévoit de s'y mettre", potentiellement bien avant (ou
+// après, en rattrapage) l'échéance réelle. Retour utilisateur -- une
+// première version de cette évolution avait fusionné les deux notions en un
+// seul champ, ce qui empêchait de distinguer "dû le 20" de "je compte le
+// faire samedi" et cassait le classement "Mes tâches" (un devoir "prévu
+// samedi 11h" ne remontait plus dans "Aujourd'hui").
+//
+// Un vrai calendrier natif (aucune limite de fenêtre -- une planification
+// lointaine reste possible) suivi, une fois une date choisie, des trous
+// libres du jour de semaine correspondant (mêmes `weeklyGaps` qu'avant,
+// domain/schedule.ts::computeWeeklyFreeGaps) pour préciser une heure. Cette
+// heure ne tient pas compte de l'alternance semaine A/B ni des jours "sans
+// cours" -- même simplification assumée que l'ancien sélecteur (Story 2.4).
 
-export interface EcheancePickerValue {
-  dateIso: string; // "yyyy-MM-dd", "" si aucune échéance
+export interface PlanPickerValue {
+  dateIso: string; // "yyyy-MM-dd", "" si aucune planification
   time: string; // "HH:mm", "" si aucune heure précise
 }
 
-export interface EcheancePickerProps {
+export interface PlanPickerProps {
   weeklyGaps: Record<Weekday, FreeGap[]>;
-  value: EcheancePickerValue;
-  onChange: (value: EcheancePickerValue) => void;
+  value: PlanPickerValue;
+  onChange: (value: PlanPickerValue) => void;
 }
 
 function gapContaining(
@@ -42,7 +42,7 @@ function gapContaining(
   return gaps.find((gap) => time >= gap.start && time <= gap.end);
 }
 
-export function EcheancePicker({ weeklyGaps, value, onChange }: EcheancePickerProps) {
+export function PlanPicker({ weeklyGaps, value, onChange }: PlanPickerProps) {
   const gaps = value.dateIso ? weeklyGaps[weekdayOfIso(value.dateIso)] : [];
   const activeGap = gapContaining(gaps, value.time);
 
@@ -71,9 +71,9 @@ export function EcheancePicker({ weeklyGaps, value, onChange }: EcheancePickerPr
 
   return (
     <div className="flex flex-col gap-2">
-      <Label htmlFor="devoir-echeance">Échéance (optionnel)</Label>
+      <Label htmlFor="devoir-plan-date">Quand vas-tu le faire ? (optionnel)</Label>
       <Input
-        id="devoir-echeance"
+        id="devoir-plan-date"
         type="date"
         value={value.dateIso}
         onChange={(e) => handleDateChange(e.target.value)}
@@ -120,11 +120,11 @@ export function EcheancePicker({ weeklyGaps, value, onChange }: EcheancePickerPr
 
           {activeGap && (
             <div className="flex items-center gap-2 pl-1 pt-1">
-              <label htmlFor="devoir-echeance-time" className="text-sm text-muted-foreground">
+              <label htmlFor="devoir-plan-time" className="text-sm text-muted-foreground">
                 Heure précise
               </label>
               <Input
-                id="devoir-echeance-time"
+                id="devoir-plan-time"
                 type="time"
                 min={activeGap.start}
                 max={activeGap.end}

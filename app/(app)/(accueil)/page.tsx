@@ -318,7 +318,10 @@ export default async function AccueilPage() {
         echeanceIso: devoir.echeance
           ? devoir.echeance.toISOString().slice(0, 10)
           : null,
-        echeanceTime: devoir.echeanceTime,
+        planDateIso: devoir.planDate
+          ? devoir.planDate.toISOString().slice(0, 10)
+          : null,
+        planTime: devoir.planTime,
         subject: {
           id: devoir.subject.id,
           name: devoir.subject.name,

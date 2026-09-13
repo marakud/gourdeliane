@@ -33,16 +33,21 @@ export interface DevoirView {
   estimatedMinutes: number | null;
   subject: { id: string; name: string; colorIndex: number };
   // Formatés côté serveur (app/(accueil)/page.tsx, AD-4) -- ce composant
-  // n'a jamais à recalculer une date lui-même.
+  // n'a jamais à recalculer une date lui-même. Échéance (date de rendu
+  // fixée par l'école) et planification (quand l'élève prévoit de le faire)
+  // sont deux notions distinctes et indépendantes (évolution CartableFlow,
+  // retour utilisateur), jamais fusionnées.
   echeanceLabel: string | null;
-  daysRemaining: number | null;
+  echeanceDaysRemaining: number | null;
   // ISO "yyyy-MM-dd" brute (retour utilisateur -- édition), à côté
   // d'`echeanceLabel` déjà formatée pour l'affichage.
   echeanceIso: string | null;
-  // Heure optionnelle accompagnant l'échéance (évolution CartableFlow --
-  // calendrier unifié, remplace l'ancien placement EDT indépendant
-  // `planned`/`plannedRaw`) -- "HH:mm", `null` si aucune heure précise.
-  echeanceTime: string | null;
+  planLabel: string | null;
+  planDaysRemaining: number | null;
+  planDateIso: string | null;
+  // Heure optionnelle accompagnant la planification -- "HH:mm", `null` si
+  // aucune heure précise.
+  planTime: string | null;
   // Classification pour la page "Mes tâches" (domain/homework.ts::classifyTaskView)
   // -- inutile pour ce bloc (Accueil ne filtre pas par vue), calculée quand
   // même par `toDevoirTaskView` en amont, sans coût à porter ici.

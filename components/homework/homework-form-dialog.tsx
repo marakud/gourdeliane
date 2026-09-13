@@ -25,7 +25,7 @@ import {
   updateDevoirAction,
   type DevoirFormInput,
 } from "@/actions/homework";
-import { EcheancePicker } from "@/components/homework/echeance-picker";
+import { PlanPicker } from "@/components/homework/plan-picker";
 import { computeWeeklyFreeGaps, type Weekday } from "@/domain/schedule";
 import { MAX_ESTIMATED_MINUTES } from "@/domain/homework";
 
@@ -51,8 +51,9 @@ export interface HomeworkFormDialogDevoir {
   subjectId: string;
   description: string;
   aRendre: boolean;
-  echeance: string; // ISO "yyyy-MM-dd", "" si aucune
-  echeanceTime: string; // "HH:mm", "" si aucune heure précise
+  echeance: string; // ISO "yyyy-MM-dd", "" si aucune -- date de rendu (école)
+  planDate: string; // ISO "yyyy-MM-dd", "" si aucune -- quand l'élève le fera
+  planTime: string; // "HH:mm", "" si aucune heure précise
   estimatedMinutes: number | null;
 }
 
@@ -108,7 +109,8 @@ const EMPTY_FORM: DevoirFormInput = {
   description: "",
   aRendre: false,
   echeance: "",
-  echeanceTime: "",
+  planDate: "",
+  planTime: "",
 };
 
 function toFormInput(
@@ -123,7 +125,8 @@ function toFormInput(
     description: devoir.description,
     aRendre: devoir.aRendre,
     echeance: devoir.echeance,
-    echeanceTime: devoir.echeanceTime,
+    planDate: devoir.planDate,
+    planTime: devoir.planTime,
     estimatedMinutes: devoir.estimatedMinutes ?? undefined,
   };
 }
@@ -320,14 +323,30 @@ export function HomeworkFormDialog({
             <span className="text-base text-foreground">À rendre</span>
           </label>
 
-          <EcheancePicker
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="devoir-echeance">Échéance (optionnel)</Label>
+            <p className="text-xs text-muted-foreground">
+              Date de rendu fixée par l&apos;école.
+            </p>
+            <Input
+              id="devoir-echeance"
+              type="date"
+              value={form.echeance ?? ""}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, echeance: e.target.value }))
+              }
+              className="h-11 text-base"
+            />
+          </div>
+
+          <PlanPicker
             weeklyGaps={weeklyGaps}
-            value={{ dateIso: form.echeance ?? "", time: form.echeanceTime ?? "" }}
+            value={{ dateIso: form.planDate ?? "", time: form.planTime ?? "" }}
             onChange={(next) =>
               setForm((f) => ({
                 ...f,
-                echeance: next.dateIso,
-                echeanceTime: next.time,
+                planDate: next.dateIso,
+                planTime: next.time,
               }))
             }
           />

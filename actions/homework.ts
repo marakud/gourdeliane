@@ -52,10 +52,10 @@ function revalidateAccueil() {
 }
 
 function revalidateEdt() {
-  // Un devoir dont l'échéance porte une heure précise (echeanceTime,
-  // évolution CartableFlow -- calendrier unifié) s'affiche dans l'EDT du jour
-  // concerné -- toute mutation doit donc aussi revalider "/edt", pas
-  // seulement Accueil.
+  // Un devoir dont la planification (planDate/planTime, évolution
+  // CartableFlow -- distincte de l'échéance) porte une heure précise
+  // s'affiche dans l'EDT du jour concerné -- toute mutation doit donc aussi
+  // revalider "/edt", pas seulement Accueil.
   safeRevalidate("/edt");
 }
 
@@ -85,12 +85,16 @@ export interface DevoirFormInput {
   description: string;
   // Optionnels (Boundaries spec 2.4) : aucune validation ne les rend requis.
   aRendre?: boolean;
-  echeance?: string; // ISO "yyyy-MM-dd", saisie via le calendrier unifié
-  // Heure optionnelle accompagnant l'échéance (évolution CartableFlow --
-  // calendrier unifié, remplace l'ancien placement EDT indépendant
-  // `plannedWeekday`/`plannedStartTime` de Story 2.4) -- n'a de sens
-  // qu'accompagnée d'une échéance, jamais seule.
-  echeanceTime?: string; // "HH:mm"
+  // Date de rendu fixée par l'école (retour utilisateur -- distincte de la
+  // planification ci-dessous, jamais fusionnées : une première version de
+  // cette évolution les avait à tort réunies en un seul champ).
+  echeance?: string; // ISO "yyyy-MM-dd"
+  // Jour + heure où l'élève prévoit de faire le devoir (évolution
+  // CartableFlow, retour utilisateur) -- indépendant de l'échéance, choisi
+  // via un calendrier proposant les trous libres de l'EDT ce jour-là.
+  // `planTime` n'a de sens qu'accompagné de `planDate`, jamais seul.
+  planDate?: string; // ISO "yyyy-MM-dd"
+  planTime?: string; // "HH:mm"
   // Durée estimée en minutes (évolution CartableFlow, facultative) --
   // presets 10/15/20/30/45/60 ou une valeur personnalisée, saisie côté
   // formulaire (HomeworkFormDialog) ; ce champ n'accepte ici qu'un entier
@@ -100,12 +104,14 @@ export interface DevoirFormInput {
 }
 
 /**
- * Parse une échéance optionnelle "yyyy-MM-dd" en `Date | null`. `undefined`
- * ou chaîne vide -> `null` (pas d'échéance saisie, cas normal -- Boundaries
- * spec 2.4). Une chaîne non vide mais mal formée est en revanche rejetée
- * plutôt que silencieusement ignorée.
+ * Parse une date ISO "yyyy-MM-dd" optionnelle en `Date | null`. Générique --
+ * réutilisée aussi bien pour l'échéance que pour la date de planification
+ * (évolution CartableFlow, deux champs indépendants du formulaire). `undefined`
+ * ou chaîne vide -> `null` (pas de date saisie, cas normal -- Boundaries spec
+ * 2.4). Une chaîne non vide mais mal formée est en revanche rejetée plutôt
+ * que silencieusement ignorée.
  */
-function parseEcheance(
+function parseOptionalIsoDate(
   dateIso: string | undefined
 ): { ok: true; value: Date | null } | { ok: false } {
   if (!dateIso || dateIso.trim().length === 0) {
@@ -121,7 +127,7 @@ function parseEcheance(
   }
   // `Date` accepte silencieusement un jour calendaire inexistant en le
   // reportant au mois suivant (ex. "2026-02-30" -> 2 mars) -- on rejette
-  // plutôt que de stocker une échéance décalée sans que l'appelant s'en
+  // plutôt que de stocker une date décalée sans que l'appelant s'en
   // aperçoive (le format seul, ci-dessus, ne suffit pas à l'exclure).
   if (parsed.toISOString().slice(0, 10) !== dateIso) {
     return { ok: false };
@@ -134,7 +140,8 @@ interface ParsedDevoirInput {
   description: string;
   aRendre: boolean;
   echeance: Date | null;
-  echeanceTime: string | null;
+  planDate: Date | null;
+  planTime: string | null;
   estimatedMinutes: number | null;
 }
 
@@ -160,14 +167,14 @@ function parseEstimatedMinutes(
  * Valide/normalise un `DevoirFormInput`, partagé par `createDevoirAction` et
  * `updateDevoirAction` (retour utilisateur -- édition, même règles que la
  * création). Matière + description sont les seuls champs obligatoires
- * (Boundaries spec 2.4) -- "à rendre" et échéance restent optionnels.
- * `echeanceTime` n'a de sens qu'accompagnant une échéance (calendrier unifié,
- * évolution CartableFlow) -- une heure sans échéance est rejetée plutôt que
- * silencieusement ignorée. La disponibilité réelle du créneau choisi n'est
- * pas revérifiée ici (pas de requête sur `ScheduleSlot`) -- le sélecteur
- * (`EcheancePicker`, `domain/schedule.ts::computeWeeklyFreeGaps`) ne propose
- * déjà que des trous libres au moment de l'affichage. Seuls le format et
- * l'appartenance à la fenêtre 8h-22h sont vérifiés ici.
+ * (Boundaries spec 2.4) -- "à rendre", échéance et planification restent
+ * optionnelles. `planTime` n'a de sens qu'accompagnant `planDate` (évolution
+ * CartableFlow) -- une heure sans date de planification est rejetée plutôt
+ * que silencieusement ignorée. La disponibilité réelle du créneau choisi
+ * n'est pas revérifiée ici (pas de requête sur `ScheduleSlot`) -- le
+ * sélecteur (`PlanPicker`, `domain/schedule.ts::computeWeeklyFreeGaps`) ne
+ * propose déjà que des trous libres au moment de l'affichage. Seuls le
+ * format et l'appartenance à la fenêtre 8h-22h sont vérifiés ici.
  */
 function parseDevoirFormInput(
   input: DevoirFormInput
@@ -179,29 +186,33 @@ function parseDevoirFormInput(
   if (input.subjectId.trim().length === 0) {
     return { ok: false, error: "Choisis une matière." };
   }
-  const echeance = parseEcheance(input.echeance);
+  const echeance = parseOptionalIsoDate(input.echeance);
   if (!echeance.ok) {
     return { ok: false, error: "Date d'échéance invalide." };
+  }
+  const planDate = parseOptionalIsoDate(input.planDate);
+  if (!planDate.ok) {
+    return { ok: false, error: "Date de planification invalide." };
   }
   const estimatedMinutes = parseEstimatedMinutes(input.estimatedMinutes);
   if (!estimatedMinutes.ok) {
     return { ok: false, error: "Durée estimée invalide." };
   }
 
-  const rawEcheanceTime = input.echeanceTime?.trim() || "";
-  if (rawEcheanceTime.length > 0) {
-    if (echeance.value === null) {
-      return { ok: false, error: "Une heure nécessite une échéance." };
+  const rawPlanTime = input.planTime?.trim() || "";
+  if (rawPlanTime.length > 0) {
+    if (planDate.value === null) {
+      return { ok: false, error: "Une heure nécessite une date de planification." };
     }
-    if (!TIME_PATTERN.test(rawEcheanceTime)) {
+    if (!TIME_PATTERN.test(rawPlanTime)) {
       return { ok: false, error: "Horaire invalide." };
     }
     // Le sélecteur ne propose que la fenêtre 8h-22h (retour utilisateur --
     // "de 8h à 22h") -- un appel direct pourrait la contourner sans ce
     // garde-fou, même s'il ne vérifie pas la disponibilité réelle du créneau.
     if (
-      rawEcheanceTime < DEFAULT_FREE_WINDOW_START ||
-      rawEcheanceTime > DEFAULT_FREE_WINDOW_END
+      rawPlanTime < DEFAULT_FREE_WINDOW_START ||
+      rawPlanTime > DEFAULT_FREE_WINDOW_END
     ) {
       return { ok: false, error: "Horaire hors de la plage 8h-22h." };
     }
@@ -214,7 +225,8 @@ function parseDevoirFormInput(
       description,
       aRendre: input.aRendre ?? false,
       echeance: echeance.value,
-      echeanceTime: rawEcheanceTime.length > 0 ? rawEcheanceTime : null,
+      planDate: planDate.value,
+      planTime: rawPlanTime.length > 0 ? rawPlanTime : null,
       estimatedMinutes: estimatedMinutes.value,
     },
   };
@@ -239,7 +251,8 @@ export async function createDevoirAction(
       parsed.value.description,
       parsed.value.aRendre,
       parsed.value.echeance,
-      parsed.value.echeanceTime,
+      parsed.value.planDate,
+      parsed.value.planTime,
       parsed.value.estimatedMinutes
     );
     revalidateAccueil();
@@ -279,7 +292,8 @@ export async function updateDevoirAction(
       parsed.value.description,
       parsed.value.aRendre,
       parsed.value.echeance,
-      parsed.value.echeanceTime,
+      parsed.value.planDate,
+      parsed.value.planTime,
       parsed.value.estimatedMinutes
     );
     revalidateAccueil();

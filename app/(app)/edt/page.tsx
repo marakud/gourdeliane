@@ -87,19 +87,19 @@ export default async function EdtPage() {
     tomorrowParity
   );
 
-  // Devoirs dont l'échéance (calendrier unifié, évolution CartableFlow) tombe
-  // précisément aujourd'hui/demain ET porte une heure précise : affichage en
-  // lecture seule dans "Aujourd'hui"/"Demain" -- cocher/supprimer reste
-  // réservé au bloc "Devoirs" d'Accueil (Code Map). Indépendant de
-  // `noSchoolDayIsoSet` : un jour "sans cours" n'annule pas le temps
-  // personnel que l'enfant s'est programmé ce jour-là.
+  // Devoirs dont la PLANIFICATION (pas l'échéance -- retour utilisateur, les
+  // deux sont indépendantes) tombe précisément aujourd'hui/demain ET porte
+  // une heure précise : affichage en lecture seule dans "Aujourd'hui"/
+  // "Demain" -- cocher/supprimer reste réservé au bloc "Devoirs" d'Accueil
+  // (Code Map). Indépendant de `noSchoolDayIsoSet` : un jour "sans cours"
+  // n'annule pas le temps personnel que l'enfant s'est programmé ce jour-là.
   const devoirs = await listDevoirs(user.id);
-  const devoirsWithEcheanceIso = devoirs.map((devoir) => ({
+  const devoirsWithPlanDateIso = devoirs.map((devoir) => ({
     ...devoir,
-    echeanceIso: devoir.echeance ? devoir.echeance.toISOString().slice(0, 10) : null,
+    planDateIso: devoir.planDate ? devoir.planDate.toISOString().slice(0, 10) : null,
   }));
-  const todayPlannedDevoirs = filterDevoirsForDate(devoirsWithEcheanceIso, todayIso);
-  const tomorrowPlannedDevoirs = filterDevoirsForDate(devoirsWithEcheanceIso, tomorrowIso);
+  const todayPlannedDevoirs = filterDevoirsForDate(devoirsWithPlanDateIso, todayIso);
+  const tomorrowPlannedDevoirs = filterDevoirsForDate(devoirsWithPlanDateIso, tomorrowIso);
 
   return (
     <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-8">

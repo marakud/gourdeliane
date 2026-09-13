@@ -11,10 +11,14 @@ import {
 // ici.
 
 /**
- * Crée un devoir. `aRendre`/`echeance`/`echeanceTime` restent optionnels
- * (Boundaries spec 2.4 : seules matière + description sont obligatoires,
- * validées en amont par actions/homework.ts) -- `done` démarre toujours à
- * `false` (défaut du schéma), aucun devoir ne peut être créé déjà fait.
+ * Crée un devoir. `aRendre`/`echeance`/`planDate`/`planTime` restent
+ * optionnels (Boundaries spec 2.4 : seules matière + description sont
+ * obligatoires, validées en amont par actions/homework.ts) -- `done`
+ * démarre toujours à `false` (défaut du schéma), aucun devoir ne peut être
+ * créé déjà fait. `echeance` (date de rendu fixée par l'école) et
+ * `planDate`/`planTime` (quand l'élève prévoit de le faire) sont deux
+ * notions distinctes, jamais synchronisées entre elles (évolution
+ * CartableFlow, retour utilisateur).
  */
 export async function createDevoir(
   userId: string,
@@ -22,7 +26,8 @@ export async function createDevoir(
   description: string,
   aRendre: boolean = false,
   echeance: Date | null = null,
-  echeanceTime: string | null = null,
+  planDate: Date | null = null,
+  planTime: string | null = null,
   estimatedMinutes: number | null = null
 ) {
   return prisma.devoir.create({
@@ -32,7 +37,8 @@ export async function createDevoir(
       description,
       aRendre,
       echeance,
-      echeanceTime,
+      planDate,
+      planTime,
       estimatedMinutes,
     },
     include: { subject: true },
@@ -53,7 +59,8 @@ export async function updateDevoir(
   description: string,
   aRendre: boolean,
   echeance: Date | null,
-  echeanceTime: string | null,
+  planDate: Date | null,
+  planTime: string | null,
   estimatedMinutes: number | null
 ) {
   return prisma.devoir.update({
@@ -63,7 +70,8 @@ export async function updateDevoir(
       description,
       aRendre,
       echeance,
-      echeanceTime,
+      planDate,
+      planTime,
       estimatedMinutes,
     },
     include: { subject: true },

@@ -44,7 +44,10 @@ export default async function MesTachesPage() {
         echeanceIso: devoir.echeance
           ? devoir.echeance.toISOString().slice(0, 10)
           : null,
-        echeanceTime: devoir.echeanceTime,
+        planDateIso: devoir.planDate
+          ? devoir.planDate.toISOString().slice(0, 10)
+          : null,
+        planTime: devoir.planTime,
         subject: {
           id: devoir.subject.id,
           name: devoir.subject.name,
@@ -74,7 +77,7 @@ export default async function MesTachesPage() {
           Mes tâches
         </h1>
         <p className="text-base text-muted-foreground">
-          Tous tes devoirs, organisés par échéance.
+          Tous tes devoirs, organisés par date.
         </p>
       </div>
 

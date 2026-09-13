@@ -71,7 +71,8 @@ describe("createDevoirAction -- création minimale (spec 2.4 I/O matrix)", () =>
     expect(devoir?.aRendre).toBe(false);
     expect(devoir?.echeance).toBeNull();
     expect(devoir?.done).toBe(false);
-    expect(devoir?.echeanceTime).toBeNull();
+    expect(devoir?.planDate).toBeNull();
+    expect(devoir?.planTime).toBeNull();
   });
 
   it("accepte aRendre + echeance quand fournis", async () => {
@@ -92,43 +93,45 @@ describe("createDevoirAction -- création minimale (spec 2.4 I/O matrix)", () =>
     expect(devoir?.echeance?.toISOString().slice(0, 10)).toBe("2026-12-20");
   });
 
-  it("accepte une échéance avec heure précise (calendrier unifié, évolution CartableFlow)", async () => {
+  it("accepte une échéance ET une planification indépendantes l'une de l'autre (retour utilisateur, évolution CartableFlow)", async () => {
     await ensureTestSubject();
 
     const result = await createDevoirAction({
       subjectId,
       description: "action-test-devoir-planned",
-      echeance: "2026-12-17", // un jeudi
-      echeanceTime: "16:00",
+      echeance: "2026-12-20",
+      planDate: "2026-12-17", // un jeudi, avant l'échéance -- prévu en avance
+      planTime: "16:00",
     });
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
     const devoir = await prisma.devoir.findUnique({ where: { id: result.data.id } });
-    expect(devoir?.echeance?.toISOString().slice(0, 10)).toBe("2026-12-17");
-    expect(devoir?.echeanceTime).toBe("16:00");
+    expect(devoir?.echeance?.toISOString().slice(0, 10)).toBe("2026-12-20");
+    expect(devoir?.planDate?.toISOString().slice(0, 10)).toBe("2026-12-17");
+    expect(devoir?.planTime).toBe("16:00");
   });
 
-  it("rejette une heure sans échéance", async () => {
+  it("rejette une heure de planification sans date de planification", async () => {
     await ensureTestSubject();
 
     const result = await createDevoirAction({
       subjectId,
-      description: "action-test-devoir-time-without-echeance",
-      echeanceTime: "16:00",
+      description: "action-test-devoir-time-without-plandate",
+      planTime: "16:00",
     });
     expect(result.ok).toBe(false);
   });
 
-  it("rejette un horaire mal formé", async () => {
+  it("rejette un horaire de planification mal formé", async () => {
     await ensureTestSubject();
 
     const result = await createDevoirAction({
       subjectId,
       description: "action-test-devoir-bad-time",
-      echeance: "2026-12-17",
-      echeanceTime: "16h00",
+      planDate: "2026-12-17",
+      planTime: "16h00",
     });
     expect(result.ok).toBe(false);
   });
@@ -303,14 +306,17 @@ describe("updateDevoirAction -- modification (retour utilisateur)", () => {
       description: "action-test-devoir-update-after",
       aRendre: true,
       echeance: "2026-12-20",
-      echeanceTime: "16:00",
+      planDate: "2026-12-17",
+      planTime: "16:00",
     });
     expect(updated.ok).toBe(true);
 
     const devoir = await prisma.devoir.findUnique({ where: { id: created.data.id } });
     expect(devoir?.description).toBe("action-test-devoir-update-after");
     expect(devoir?.aRendre).toBe(true);
-    expect(devoir?.echeanceTime).toBe("16:00");
+    expect(devoir?.echeance?.toISOString().slice(0, 10)).toBe("2026-12-20");
+    expect(devoir?.planDate?.toISOString().slice(0, 10)).toBe("2026-12-17");
+    expect(devoir?.planTime).toBe("16:00");
   });
 
   it("ne touche jamais à `done` (AD-7, réservé à toggleDevoirDoneAction)", async () => {
