@@ -53,6 +53,7 @@ model User {
   dayCompletions              DayCompletion[]
   pushSubscriptions           PushSubscription[]
   lessonLogs                  LessonLog[]
+  homeworkTimeSessions        HomeworkTimeSession[]
 }
 
 // Jour de la semaine d'un créneau récurrent.
@@ -269,7 +270,37 @@ model Devoir {
   status           String @default("TODO")
   estimatedMinutes Int?
 
+  timeSessions HomeworkTimeSession[]
+
   @@index([userId, done])
+}
+
+// Une session de travail chronométrée sur un devoir (évolution CartableFlow,
+// retour utilisateur -- bouton "Commencer") : soit un chronomètre libre
+// (`mode = "CHRONO"`, `plannedSeconds = null`), soit un minuteur avec durée
+// prévue (`mode = "MINUTEUR"`, `plannedSeconds` requis) -- retour utilisateur
+// explicite : "soit pour chronométrer soit pour [limiter] que l'élève a 1h
+// par exemple pour faire le devoir". `endedAt = null` signifie une session
+// EN COURS -- au plus une par devoir en pratique (l'UI n'en propose jamais
+// deux), mais rien ici ne l'impose au niveau base. Pas de pause/reprise dans
+// cette version (non demandé) : "s'arrêter" sans avoir fini crée une
+// nouvelle session au prochain "Commencer", jamais une reprise de
+// l'ancienne. `startedAt` (horodatage serveur réel, pas un chrono côté
+// client) est ce qui rend l'affichage résistant à un rechargement de page :
+// le temps écoulé se recalcule toujours depuis cet instant, jamais depuis un
+// état perdu au reload.
+model HomeworkTimeSession {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  devoirId       String
+  devoir         Devoir    @relation(fields: [devoirId], references: [id], onDelete: Cascade)
+  mode           String
+  plannedSeconds Int?
+  startedAt      DateTime  @default(now())
+  endedAt        DateTime?
+
+  @@index([userId, devoirId])
 }
 
 // "Cahier de texte" (évolution CartableFlow, retour utilisateur) : une entrée

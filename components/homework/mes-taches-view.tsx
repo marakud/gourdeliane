@@ -21,7 +21,8 @@ import { DevoirRow } from "@/components/homework/devoir-row";
 import type {
   DeleteDevoirAction,
   DevoirView,
-  StartDevoirAction,
+  StartTimerAction,
+  StopTimerAction,
   ToggleDevoirDoneAction,
 } from "@/components/homework/devoirs-list";
 import type {
@@ -80,7 +81,8 @@ export interface MesTachesViewProps {
   subjects: HomeworkFormDialogSubject[];
   scheduleSlots?: HomeworkFormDialogSlot[];
   onToggle: ToggleDevoirDoneAction;
-  onStart: StartDevoirAction;
+  onStartTimer: StartTimerAction;
+  onStopTimer: StopTimerAction;
   onDelete: DeleteDevoirAction;
 }
 
@@ -89,22 +91,16 @@ export function MesTachesView({
   subjects,
   scheduleSlots = [],
   onToggle,
-  onStart,
+  onStartTimer,
+  onStopTimer,
   onDelete,
 }: MesTachesViewProps) {
   const [activeView, setActiveView] = useState<TaskViewCategory>(TASK_VIEW_TODAY);
   const [subjectFilter, setSubjectFilter] = useState<string>(SUBJECT_FILTER_ALL);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(STATUS_FILTER_ALL);
 
-  const {
-    visibleDevoirs,
-    pendingIds,
-    errorIds,
-    handleToggle,
-    handleStart,
-    handleDelete,
-    setPending,
-  } = useDevoirActions(devoirs, onToggle, onStart, onDelete);
+  const { visibleDevoirs, pendingIds, errorIds, handleToggle, handleDelete, setPending } =
+    useDevoirActions(devoirs, onToggle, onDelete);
 
   const isDoneView = activeView === TASK_VIEW_DONE;
 
@@ -215,7 +211,8 @@ export function MesTachesView({
               pending={pendingIds.has(devoir.id)}
               hasError={errorIds.has(devoir.id)}
               onToggle={() => handleToggle(devoir.id)}
-              onStart={() => handleStart(devoir.id)}
+              onStartTimer={onStartTimer}
+              onStopTimer={onStopTimer}
               onDelete={() => handleDelete(devoir.id)}
               onPendingChange={(pending) => setPending(devoir.id, pending)}
               subjects={subjects}

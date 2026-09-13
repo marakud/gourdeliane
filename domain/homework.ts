@@ -5,6 +5,8 @@
 // les dates "aujourd'hui" sont toujours reçues en `todayIso` explicite par
 // l'appelant (app/(accueil)/page.tsx, calculé via domain/school-day.ts).
 
+import type { ActiveHomeworkSession } from "./homework-timer";
+
 // Évolution CartableFlow (modèle de tâches enrichi) -- statut à 3 valeurs,
 // coexiste avec `done` (AD-7) plutôt que de le remplacer : `done` reste la
 // seule source de vérité pour le Sac du soir/streak/DevoirsList, `status`
@@ -193,6 +195,13 @@ export interface DevoirTaskViewInput {
   planDateIso: string | null;
   planTime: string | null;
   subject: { id: string; name: string; colorIndex: number };
+  // Minuteur de devoirs (évolution CartableFlow, retour utilisateur) -- déjà
+  // résumés par domain/homework-timer.ts::summarizeHomeworkTimeSessions en
+  // amont (l'appelant charge toutes les sessions une seule fois pour tous
+  // les devoirs) : cette fonction ne fait jamais de second calcul divergent,
+  // seulement un passage direct (AD-5).
+  activeSession: ActiveHomeworkSession | null;
+  totalRealSeconds: number;
 }
 
 /** Vue enrichie d'un devoir, prête à afficher -- même forme que
@@ -214,6 +223,8 @@ export interface DevoirTaskView {
   planDaysRemaining: number | null;
   planDateIso: string | null;
   planTime: string | null;
+  activeSession: ActiveHomeworkSession | null;
+  totalRealSeconds: number;
   taskView: TaskViewCategory;
 }
 
@@ -254,6 +265,8 @@ export function toDevoirTaskView(
     // le rejette à l'écriture) -- au cas où une ligne historique en aurait
     // quand même une (ex. donnée migrée), on ne l'affiche jamais seule.
     planTime: devoir.planDateIso ? devoir.planTime : null,
+    activeSession: devoir.activeSession,
+    totalRealSeconds: devoir.totalRealSeconds,
     taskView: classifyTaskView(devoir.done, planDaysRemaining, echeanceDaysRemaining),
   };
 }

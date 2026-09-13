@@ -4,11 +4,10 @@ import { prisma } from "../data/prisma";
 import {
   createDevoirAction,
   deleteDevoirAction,
-  startDevoirAction,
   toggleDevoirDoneAction,
   updateDevoirAction,
 } from "./homework";
-import { DEVOIR_STATUS_DONE, DEVOIR_STATUS_IN_PROGRESS } from "@/domain/homework";
+import { startHomeworkTimerAction } from "./homework-timer";
 
 // Tests d'intégration contre la vraie base de dev (SQLite). Comme
 // actions/checklist.test.ts, ces actions résolvent l'utilisateur depuis la
@@ -243,50 +242,24 @@ describe("toggleDevoirDoneAction -- bidirectionnel, jamais supprimé (AD-7)", ()
     const result = await toggleDevoirDoneAction({ id: "", done: true });
     expect(result.ok).toBe(false);
   });
-});
 
-describe("startDevoirAction -- bouton \"Commencer\" (évolution CartableFlow)", () => {
-  it("passe un devoir TODO à IN_PROGRESS", async () => {
+  it("arrête une session de minuteur active quand le devoir passe à fait (évolution CartableFlow -- plus rien à chronométrer)", async () => {
     await ensureTestSubject();
 
     const created = await createDevoirAction({
       subjectId,
-      description: "action-test-devoir-start",
+      description: "action-test-devoir-toggle-stops-timer",
     });
     expect(created.ok).toBe(true);
     if (!created.ok) return;
 
-    const started = await startDevoirAction({ id: created.data.id });
-    expect(started.ok).toBe(true);
-    if (started.ok) expect(started.data.started).toBe(true);
-
-    const devoir = await prisma.devoir.findUnique({ where: { id: created.data.id } });
-    expect(devoir?.status).toBe(DEVOIR_STATUS_IN_PROGRESS);
-  });
-
-  it("ne redémarre pas un devoir déjà fait (started=false, pas une erreur)", async () => {
-    await ensureTestSubject();
-
-    const created = await createDevoirAction({
-      subjectId,
-      description: "action-test-devoir-start-done",
-    });
-    expect(created.ok).toBe(true);
-    if (!created.ok) return;
-
+    await startHomeworkTimerAction({ devoirId: created.data.id, mode: "CHRONO" });
     await toggleDevoirDoneAction({ id: created.data.id, done: true });
 
-    const started = await startDevoirAction({ id: created.data.id });
-    expect(started.ok).toBe(true);
-    if (started.ok) expect(started.data.started).toBe(false);
-
-    const devoir = await prisma.devoir.findUnique({ where: { id: created.data.id } });
-    expect(devoir?.status).toBe(DEVOIR_STATUS_DONE);
-  });
-
-  it("rejette un id vide", async () => {
-    const result = await startDevoirAction({ id: "" });
-    expect(result.ok).toBe(false);
+    const session = await prisma.homeworkTimeSession.findFirst({
+      where: { devoirId: created.data.id },
+    });
+    expect(session?.endedAt).not.toBeNull();
   });
 });
 

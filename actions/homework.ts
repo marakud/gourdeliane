@@ -5,10 +5,10 @@ import { requireUserId } from "@/lib/current-user";
 import {
   createDevoir,
   deleteDevoir,
-  startDevoir,
   toggleDevoirDone,
   updateDevoir,
 } from "@/data/homework";
+import { endActiveHomeworkTimeSession } from "@/data/homework-timer";
 import { recomputeAndPersistSoirCompletion } from "@/data/day-completion";
 import {
   DEFAULT_FREE_WINDOW_END,
@@ -77,6 +77,19 @@ async function safeRecomputeSoirCompletion(userId: string) {
     await recomputeAndPersistSoirCompletion(userId, new Date());
   } catch (error) {
     console.error("recomputeAndPersistSoirCompletion failed:", error);
+  }
+}
+
+// Minuteur de devoirs (évolution CartableFlow, retour utilisateur) -- marquer
+// un devoir fait arrête toute session en cours (le travail est terminé, plus
+// rien à chronométrer) : best-effort, même raisonnement que
+// `safeRecomputeSoirCompletion` -- la bascule "fait" a déjà réussi, cet
+// arrêt ne doit jamais la remettre en cause.
+async function safeStopActiveTimeSession(userId: string, devoirId: string) {
+  try {
+    await endActiveHomeworkTimeSession(userId, devoirId);
+  } catch (error) {
+    console.error("endActiveHomeworkTimeSession failed:", error);
   }
 }
 
@@ -338,6 +351,9 @@ export async function toggleDevoirDoneAction(
     // avale ses propres erreurs) : la bascule elle-même a déjà réussi à ce
     // stade, ce recalcul ne doit jamais la remettre en cause.
     await safeRecomputeSoirCompletion(userId);
+    if (input.done) {
+      await safeStopActiveTimeSession(userId, input.id);
+    }
     return { ok: true, data: null };
   } catch (error) {
     console.error("toggleDevoirDoneAction failed:", error);
@@ -345,37 +361,6 @@ export async function toggleDevoirDoneAction(
       ok: false,
       error: "Impossible de mettre à jour le devoir. Réessaie.",
     };
-  }
-}
-
-export interface StartDevoirInput {
-  id: string;
-}
-
-/**
- * Passe un devoir en "En cours" (bouton "Commencer", évolution
- * CartableFlow) -- ne touche jamais `done`/le statut d'un devoir déjà
- * démarré ou fait (data/homework.ts::startDevoir, idempotent). `started:
- * false` (devoir déjà IN_PROGRESS/DONE ou introuvable) reste `{ ok: true }`
- * -- ce n'est pas une erreur utilisateur, juste un no-op silencieux.
- */
-export async function startDevoirAction(
-  input: StartDevoirInput
-): Promise<ActionResult<{ started: boolean }>> {
-  if (input.id.trim().length === 0) {
-    return { ok: false, error: "Devoir invalide." };
-  }
-
-  try {
-    const userId = await requireUserId();
-    const result = await startDevoir(input.id, userId);
-    revalidateAccueil();
-    revalidateEdt();
-    revalidateMesTaches();
-    return { ok: true, data: result };
-  } catch (error) {
-    console.error("startDevoirAction failed:", error);
-    return { ok: false, error: "Impossible de démarrer le devoir. Réessaie." };
   }
 }
 

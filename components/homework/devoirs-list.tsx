@@ -15,6 +15,7 @@ import {
   type DevoirStatus,
   type TaskViewCategory,
 } from "@/domain/homework";
+import type { ActiveHomeworkSession } from "@/domain/homework-timer";
 
 // Bloc "Devoirs" (Accueil, Story 2.4 -- retour utilisateur : contrairement à
 // la première itération, un devoir coché reste affiché (coché), jamais
@@ -52,6 +53,12 @@ export interface DevoirView {
   // -- inutile pour ce bloc (Accueil ne filtre pas par vue), calculée quand
   // même par `toDevoirTaskView` en amont, sans coût à porter ici.
   taskView: TaskViewCategory;
+  // Minuteur de devoirs (évolution CartableFlow, retour utilisateur) --
+  // `activeSession` non nul = un chronomètre/minuteur tourne actuellement
+  // sur ce devoir (affiché en direct sur la carte dédiée d'Accueil, jamais
+  // recalculé ici). `totalRealSeconds` cumule les sessions déjà terminées.
+  activeSession: ActiveHomeworkSession | null;
+  totalRealSeconds: number;
 }
 
 export type ToggleDevoirDoneAction = (input: {
@@ -63,15 +70,22 @@ export type DeleteDevoirAction = (input: {
   id: string;
 }) => Promise<ActionResult<null>>;
 
-export type StartDevoirAction = (input: {
-  id: string;
+export type StartTimerAction = (input: {
+  devoirId: string;
+  mode: string;
+  plannedMinutes?: number;
 }) => Promise<ActionResult<{ started: boolean }>>;
+
+export type StopTimerAction = (input: {
+  devoirId: string;
+}) => Promise<ActionResult<{ stopped: boolean }>>;
 
 export interface DevoirsListProps {
   devoirs: DevoirView[];
   onToggle: ToggleDevoirDoneAction;
   onDelete: DeleteDevoirAction;
-  onStart: StartDevoirAction;
+  onStartTimer: StartTimerAction;
+  onStopTimer: StopTimerAction;
   // Nécessaires pour le formulaire d'édition (retour utilisateur) -- mêmes
   // données que celles déjà passées à AddHomeworkFab.
   subjects: HomeworkFormDialogSubject[];
@@ -82,19 +96,13 @@ export function DevoirsList({
   devoirs,
   onToggle,
   onDelete,
-  onStart,
+  onStartTimer,
+  onStopTimer,
   subjects,
   scheduleSlots = [],
 }: DevoirsListProps) {
-  const {
-    visibleDevoirs,
-    pendingIds,
-    errorIds,
-    handleToggle,
-    handleStart,
-    handleDelete,
-    setPending,
-  } = useDevoirActions(devoirs, onToggle, onStart, onDelete);
+  const { visibleDevoirs, pendingIds, errorIds, handleToggle, handleDelete, setPending } =
+    useDevoirActions(devoirs, onToggle, onDelete);
 
   const doneCount = visibleDevoirs.filter((devoir) => devoir.done).length;
   const workload = computeEstimatedWorkload(visibleDevoirs);
@@ -143,7 +151,8 @@ export function DevoirsList({
               pending={pendingIds.has(devoir.id)}
               hasError={errorIds.has(devoir.id)}
               onToggle={() => handleToggle(devoir.id)}
-              onStart={() => handleStart(devoir.id)}
+              onStartTimer={onStartTimer}
+              onStopTimer={onStopTimer}
               onDelete={() => handleDelete(devoir.id)}
               onPendingChange={(pending) => setPending(devoir.id, pending)}
               subjects={subjects}

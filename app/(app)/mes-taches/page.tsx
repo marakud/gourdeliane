@@ -2,12 +2,11 @@ import { connection } from "next/server";
 import { requireUserId } from "@/lib/current-user";
 import { getScheduleForUser } from "@/data/schedule";
 import { listDevoirs } from "@/data/homework";
-import {
-  deleteDevoirAction,
-  startDevoirAction,
-  toggleDevoirDoneAction,
-} from "@/actions/homework";
+import { listHomeworkTimeSessions } from "@/data/homework-timer";
+import { deleteDevoirAction, toggleDevoirDoneAction } from "@/actions/homework";
+import { startHomeworkTimerAction, stopHomeworkTimerAction } from "@/actions/homework-timer";
 import { toDevoirTaskView, type DevoirStatus } from "@/domain/homework";
+import { summarizeHomeworkTimeSessions, type TimerMode } from "@/domain/homework-timer";
 import { getTodaySchoolDate, schoolDateToIso } from "@/domain/school-day";
 import type { Weekday } from "@/domain/schedule";
 import { MesTachesView } from "@/components/homework/mes-taches-view";
@@ -29,6 +28,17 @@ export default async function MesTachesPage() {
   const userId = await requireUserId();
   const { subjects, scheduleSlots } = await getScheduleForUser(userId);
   const devoirs = await listDevoirs(userId);
+  const timeSessions = await listHomeworkTimeSessions(userId);
+  const { activeSessionByDevoirId, totalEndedSecondsByDevoirId } =
+    summarizeHomeworkTimeSessions(
+      timeSessions.map((session) => ({
+        devoirId: session.devoirId,
+        mode: session.mode as TimerMode,
+        plannedSeconds: session.plannedSeconds,
+        startedAtIso: session.startedAt.toISOString(),
+        endedAtIso: session.endedAt ? session.endedAt.toISOString() : null,
+      }))
+    );
 
   const todayIso = schoolDateToIso(getTodaySchoolDate(new Date()));
 
@@ -53,6 +63,8 @@ export default async function MesTachesPage() {
           name: devoir.subject.name,
           colorIndex: devoir.subject.colorIndex,
         },
+        activeSession: activeSessionByDevoirId.get(devoir.id) ?? null,
+        totalRealSeconds: totalEndedSecondsByDevoirId.get(devoir.id) ?? 0,
       },
       todayIso
     )
@@ -86,7 +98,8 @@ export default async function MesTachesPage() {
         subjects={homeworkSubjects}
         scheduleSlots={slots}
         onToggle={toggleDevoirDoneAction}
-        onStart={startDevoirAction}
+        onStartTimer={startHomeworkTimerAction}
+        onStopTimer={stopHomeworkTimerAction}
         onDelete={deleteDevoirAction}
       />
 

@@ -8,6 +8,7 @@ import {
   listSubjectItemsForSubjects,
 } from "@/data/checklist";
 import { listDevoirs } from "@/data/homework";
+import { listHomeworkTimeSessions } from "@/data/homework-timer";
 import {
   computeWeekParity,
   dedupeSubjectsFromSlots,
@@ -37,6 +38,7 @@ import {
   type ChecklistSubjectGroupInput,
 } from "@/domain/checklist";
 import { toDevoirTaskView } from "@/domain/homework";
+import { summarizeHomeworkTimeSessions, type TimerMode } from "@/domain/homework-timer";
 import {
   computeSoirCompletion,
   countBlockProgress,
@@ -48,16 +50,14 @@ import {
   toggleRetourChecklistItem,
   toggleRevisionsChecklistItem,
 } from "@/actions/checklist";
-import {
-  deleteDevoirAction,
-  startDevoirAction,
-  toggleDevoirDoneAction,
-} from "@/actions/homework";
+import { deleteDevoirAction, toggleDevoirDoneAction } from "@/actions/homework";
+import { startHomeworkTimerAction, stopHomeworkTimerAction } from "@/actions/homework-timer";
 import type { DevoirStatus } from "@/domain/homework";
 import { SacChecklist } from "@/components/checklist/sac-checklist";
 import { FixedChecklist } from "@/components/checklist/fixed-checklist";
 import { RevisionsChecklist } from "@/components/checklist/revisions-checklist";
 import { DevoirsList } from "@/components/homework/devoirs-list";
+import { ActiveSessionCard } from "@/components/homework/active-session-card";
 import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
 import { GreetingCard } from "@/components/moment/greeting-card";
 import { MomentSoirCard } from "@/components/moment/moment-soir-card";
@@ -149,6 +149,22 @@ export default async function AccueilPage() {
   // (echeanceLabel/daysRemaining, qui a besoin de `todayIso`) est fait plus
   // bas, à partir de ce même tableau (pas de second aller-retour DB).
   const devoirs = await listDevoirs(user.id);
+
+  // Minuteur de devoirs (évolution CartableFlow, retour utilisateur) --
+  // chargées une seule fois pour tous les devoirs, résumées en un seul
+  // passage (domain/homework-timer.ts::summarizeHomeworkTimeSessions),
+  // jamais une requête par devoir.
+  const timeSessions = await listHomeworkTimeSessions(user.id);
+  const { activeSessionByDevoirId, totalEndedSecondsByDevoirId } =
+    summarizeHomeworkTimeSessions(
+      timeSessions.map((session) => ({
+        devoirId: session.devoirId,
+        mode: session.mode as TimerMode,
+        plannedSeconds: session.plannedSeconds,
+        startedAtIso: session.startedAt.toISOString(),
+        endedAtIso: session.endedAt ? session.endedAt.toISOString() : null,
+      }))
+    );
 
   // Story 2.5 (FR-18) -- routage pur et testé (domain/checklist.ts), un seul
   // passage plutôt que deux boucles séparées couplées par un commentaire :
@@ -327,6 +343,8 @@ export default async function AccueilPage() {
           name: devoir.subject.name,
           colorIndex: devoir.subject.colorIndex,
         },
+        activeSession: activeSessionByDevoirId.get(devoir.id) ?? null,
+        totalRealSeconds: totalEndedSecondsByDevoirId.get(devoir.id) ?? 0,
       },
       todayIso
     )
@@ -337,6 +355,19 @@ export default async function AccueilPage() {
     name: subject.name,
     colorIndex: subject.colorIndex,
   }));
+
+  // Minuteur de devoirs -- entrées pour la carte "Devoir en cours", affichée
+  // au-dessus des onglets Matin/Retour/Soir (pertinente quel que soit le
+  // moment actif). Dérivée de `devoirsView` déjà enrichi, jamais un second
+  // calcul divergent.
+  const activeSessionEntries = devoirsView
+    .filter((devoir) => devoir.activeSession !== null)
+    .map((devoir) => ({
+      devoirId: devoir.id,
+      description: devoir.description,
+      subject: { name: devoir.subject.name, colorIndex: devoir.subject.colorIndex },
+      session: devoir.activeSession!,
+    }));
 
   // "Devoirs pour demain" (retour utilisateur) -- devoirs dont l'échéance
   // tombe précisément demain, à côté du sac (bloc "Avant d'aller se
@@ -416,6 +447,12 @@ export default async function AccueilPage() {
         progress={currentMomentProgress}
       />
 
+      <ActiveSessionCard
+        entries={activeSessionEntries}
+        onMarkDone={toggleDevoirDoneAction}
+        onStop={stopHomeworkTimerAction}
+      />
+
       <MomentTabs
         initialActive={currentMoment}
         matin={
@@ -459,7 +496,8 @@ export default async function AccueilPage() {
                 devoirs={devoirsView}
                 onToggle={toggleDevoirDoneAction}
                 onDelete={deleteDevoirAction}
-                onStart={startDevoirAction}
+                onStartTimer={startHomeworkTimerAction}
+                onStopTimer={stopHomeworkTimerAction}
                 subjects={homeworkSubjects}
                 scheduleSlots={slots}
               />

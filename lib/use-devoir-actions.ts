@@ -4,22 +4,22 @@ import { useState, useTransition } from "react";
 import type {
   DeleteDevoirAction,
   DevoirView,
-  StartDevoirAction,
   ToggleDevoirDoneAction,
 } from "@/components/homework/devoirs-list";
-import {
-  DEVOIR_STATUS_DONE,
-  DEVOIR_STATUS_IN_PROGRESS,
-  DEVOIR_STATUS_TODO,
-} from "@/domain/homework";
+import { DEVOIR_STATUS_DONE, DEVOIR_STATUS_TODO } from "@/domain/homework";
 
 // Extrait de components/homework/devoirs-list.tsx (évolution CartableFlow,
 // page "Mes tâches") -- la même logique de mise à jour optimiste
-// (cocher/commencer/supprimer un devoir) est désormais partagée entre le
-// bloc "Devoirs" de l'Accueil ET la nouvelle page "Mes tâches", plutôt que
+// (cocher/supprimer un devoir) est désormais partagée entre le bloc
+// "Devoirs" de l'Accueil ET la nouvelle page "Mes tâches", plutôt que
 // dupliquée. `visibleDevoirs` renvoie déjà `done`/`status` fusionnés avec
 // l'état optimiste et les devoirs supprimés exclus -- l'appelant n'a jamais
-// à connaître `doneById`/`statusById` lui-même.
+// à connaître `doneById`/`statusById` lui-même. Démarrer/arrêter un minuteur
+// (évolution CartableFlow, StartTimerDialog) ne passe PAS par ce hook -- pas
+// de mise à jour optimiste pour ces deux actions, le composant se contente
+// de la revalidation serveur (comme HomeworkFormDialog pour créer/modifier),
+// suffisant vu qu'ouvrir un dialogue de choix implique déjà un temps
+// d'interaction (contrairement à un simple tap).
 
 function doneMapFrom(devoirs: readonly { id: string; done: boolean }[]) {
   const map: Record<string, boolean> = {};
@@ -40,7 +40,6 @@ export interface UseDevoirActionsResult {
   pendingIds: Set<string>;
   errorIds: Set<string>;
   handleToggle: (id: string) => void;
-  handleStart: (id: string) => void;
   handleDelete: (id: string) => void;
   setPending: (id: string, pending: boolean) => void;
 }
@@ -48,7 +47,6 @@ export interface UseDevoirActionsResult {
 export function useDevoirActions(
   devoirs: readonly DevoirView[],
   onToggle: ToggleDevoirDoneAction,
-  onStart: StartDevoirAction,
   onDelete: DeleteDevoirAction
 ): UseDevoirActionsResult {
   const [doneById, setDoneById] = useState<Record<string, boolean>>(() =>
@@ -119,24 +117,6 @@ export function useDevoirActions(
     });
   }
 
-  function handleStart(id: string) {
-    if (pendingIds.has(id)) return;
-    if (statusById[id] !== DEVOIR_STATUS_TODO) return;
-
-    clearError(id);
-    setPending(id, true);
-    setStatusById((prev) => ({ ...prev, [id]: DEVOIR_STATUS_IN_PROGRESS }));
-
-    startTransition(async () => {
-      const result = await onStart({ id });
-      if (!result.ok) {
-        setStatusById((prev) => ({ ...prev, [id]: DEVOIR_STATUS_TODO }));
-        addError(id);
-      }
-      setPending(id, false);
-    });
-  }
-
   function handleDelete(id: string) {
     if (pendingIds.has(id)) return;
 
@@ -171,7 +151,6 @@ export function useDevoirActions(
     pendingIds,
     errorIds,
     handleToggle,
-    handleStart,
     handleDelete,
     setPending,
   };
