@@ -10,6 +10,7 @@ import { summarizeHomeworkTimeSessions, type TimerMode } from "@/domain/homework
 import { getTodaySchoolDate, schoolDateToIso } from "@/domain/school-day";
 import type { Weekday } from "@/domain/schedule";
 import { MesTachesView } from "@/components/homework/mes-taches-view";
+import { ActiveSessionCard } from "@/components/homework/active-session-card";
 import { AddHomeworkFab } from "@/components/homework/add-homework-fab";
 
 // Évolution CartableFlow -- page "Mes tâches" (étape 3 du plan) : regroupe
@@ -82,6 +83,19 @@ export default async function MesTachesPage() {
     endTime: slot.endTime,
   }));
 
+  // Minuteur de devoirs -- même carte "Devoir en cours" que l'Accueil
+  // (retour utilisateur : invisible ici auparavant, alors que "Mes tâches"
+  // est l'écran où un devoir est le plus souvent démarré). Dérivée de
+  // `devoirsView` déjà enrichi, jamais un second calcul divergent (AD-5).
+  const activeSessionEntries = devoirsView
+    .filter((devoir) => devoir.activeSession !== null)
+    .map((devoir) => ({
+      devoirId: devoir.id,
+      description: devoir.description,
+      subject: { name: devoir.subject.name, colorIndex: devoir.subject.colorIndex },
+      session: devoir.activeSession!,
+    }));
+
   return (
     <div className="mx-auto flex max-w-lg flex-col gap-4 px-4 py-8">
       <div>
@@ -92,6 +106,12 @@ export default async function MesTachesPage() {
           Tous tes devoirs, organisés par date.
         </p>
       </div>
+
+      <ActiveSessionCard
+        entries={activeSessionEntries}
+        onMarkDone={toggleDevoirDoneAction}
+        onStop={stopHomeworkTimerAction}
+      />
 
       <MesTachesView
         devoirs={devoirsView}
