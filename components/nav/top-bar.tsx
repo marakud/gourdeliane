@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Backpack, Brain, Settings } from "lucide-react";
+import { Backpack, Settings } from "lucide-react";
 
 // Barre supérieure minimale : logo/nom de l'app + accès à Réglages.
 // Réglages est volontairement hors de la barre de navigation basse à 3 onglets
@@ -15,22 +15,13 @@ export function TopBar() {
         <Backpack aria-hidden="true" className="size-5" strokeWidth={2.25} />
         CartableFlow
       </span>
-      <div className="flex items-center gap-1">
-        <Link
-          href="/memoire"
-          className="flex min-h-11 items-center gap-1.5 rounded-xl px-2.5 text-sm font-semibold text-primary transition-colors hover:bg-primary/10"
-        >
-          <Brain aria-hidden="true" className="size-5" />
-          Mémoire
-        </Link>
-        <Link
-          href="/reglages"
-          aria-label="Réglages"
-          className="flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-        >
-          <Settings aria-hidden="true" className="size-6" />
-        </Link>
-      </div>
+      <Link
+        href="/reglages"
+        aria-label="Réglages"
+        className="flex size-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+      >
+        <Settings aria-hidden="true" className="size-6" />
+      </Link>
     </header>
   );
 }
