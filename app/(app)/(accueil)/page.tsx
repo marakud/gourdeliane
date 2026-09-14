@@ -26,10 +26,12 @@ import {
 } from "@/domain/school-day";
 import {
   CHECKLIST_TYPE_MATIN,
+  CHECKLIST_TYPE_PREPARATION_SOIR,
   CHECKLIST_TYPE_RETOUR,
   CHECKLIST_TYPE_REVISIONS,
   CHECKLIST_TYPE_SAC,
   DEFAULT_MATIN_ITEMS,
+  DEFAULT_PREPARATION_SOIR_ITEMS,
   DEFAULT_RETOUR_ITEMS,
   deriveFixedChecklist,
   deriveRevisionsChecklist,
@@ -47,6 +49,7 @@ import {
 } from "@/domain/day-completion";
 import {
   toggleMatinChecklistItem,
+  togglePreparationSoirChecklistItem,
   toggleRetourChecklistItem,
   toggleRevisionsChecklistItem,
 } from "@/actions/checklist";
@@ -264,6 +267,10 @@ export default async function AccueilPage() {
     retourItems,
     retourCheckedStates,
     revisionsCheckedStates,
+    preparationSoirItems,
+    preparationSoirCheckedStates,
+    todaySubjectItems,
+    todaySacCheckedStates,
   ] = await Promise.all([
     listFixedChecklistItems(user.id, CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS),
     listChecklistItemStates(user.id, todayDateAsDate, CHECKLIST_TYPE_MATIN),
@@ -276,6 +283,22 @@ export default async function AccueilPage() {
     // inféré coïncidant seulement par structure.
     todaySubjects.length > 0
       ? listChecklistItemStates(user.id, todayDateAsDate, CHECKLIST_TYPE_REVISIONS)
+      : Promise.resolve<Awaited<ReturnType<typeof listChecklistItemStates>>>([]),
+    listFixedChecklistItems(
+      user.id,
+      CHECKLIST_TYPE_PREPARATION_SOIR,
+      DEFAULT_PREPARATION_SOIR_ITEMS
+    ),
+    listChecklistItemStates(
+      user.id,
+      todayDateAsDate,
+      CHECKLIST_TYPE_PREPARATION_SOIR
+    ),
+    todaySubjects.length > 0
+      ? listSubjectItemsForSubjects(user.id, todaySubjects.map((subject) => subject.id))
+      : Promise.resolve<Awaited<ReturnType<typeof listSubjectItemsForSubjects>>>([]),
+    todaySubjects.length > 0
+      ? listChecklistItemStates(user.id, todayDateAsDate, CHECKLIST_TYPE_SAC)
       : Promise.resolve<Awaited<ReturnType<typeof listChecklistItemStates>>>([]),
   ]);
 
@@ -296,6 +319,33 @@ export default async function AccueilPage() {
       checked: state.checked,
     }))
   );
+
+  const preparationSoirChecklist = deriveFixedChecklist(
+    preparationSoirItems.map((item) => ({ id: item.id, label: item.label })),
+    preparationSoirCheckedStates.map((state) => ({
+      sourceType: state.sourceType,
+      sourceId: state.sourceId,
+      checked: state.checked,
+    }))
+  );
+
+  const todayItemsBySubjectId = new Map<string, { id: string; label: string }[]>();
+  for (const item of todaySubjectItems) {
+    const list = todayItemsBySubjectId.get(item.subjectId) ?? [];
+    list.push({ id: item.id, label: item.label });
+    todayItemsBySubjectId.set(item.subjectId, list);
+  }
+  const morningSpecificGroups = deriveSacChecklist(
+    todaySubjects.map((subject) => ({
+      subject: { id: subject.id, name: subject.name, colorIndex: subject.colorIndex },
+      items: todayItemsBySubjectId.get(subject.id) ?? [],
+    })),
+    todaySacCheckedStates.map((state) => ({
+      sourceType: state.sourceType,
+      sourceId: state.sourceId,
+      checked: state.checked,
+    }))
+  ).filter((group) => group.items.length > 0);
 
   // Progression Matin/Retour (refonte visuelle, carte d'accueil) -- réutilise
   // les mêmes checklists que celles affichées dans les onglets, jamais un
@@ -404,6 +454,7 @@ export default async function AccueilPage() {
   const soirComplete = computeSoirCompletion({
     sacGroups,
     revisionsItems: revisionsChecklist,
+    preparationItems: preparationSoirChecklist,
     devoirsARendreDemain,
   });
   // Même agrégation que `soirComplete` juste au-dessus, en décompte
@@ -411,6 +462,7 @@ export default async function AccueilPage() {
   const soirProgress = countSoirProgress({
     sacGroups,
     revisionsItems: revisionsChecklist,
+    preparationItems: preparationSoirChecklist,
     devoirsARendreDemain,
   });
 
@@ -456,42 +508,46 @@ export default async function AccueilPage() {
       <MomentTabs
         initialActive={currentMoment}
         matin={
-          <FixedChecklist
-            title="Ce matin"
-            items={matinChecklist}
-            dateIso={todayIso}
-            headingId="matin-heading"
-            onToggle={toggleMatinChecklistItem}
-            hideTitle
-          />
+          <div className="flex flex-col gap-4">
+            <FixedChecklist
+              title="Dernières vérifications"
+              items={matinChecklist}
+              dateIso={todayIso}
+              headingId="matin-heading"
+              onToggle={toggleMatinChecklistItem}
+              hideTitle
+            />
+            {morningSpecificGroups.length > 0 && (
+              <div className="rounded-2xl bg-card p-4 shadow-brand ring-1 ring-border">
+                <SacChecklist
+                  title="Objets particuliers aujourd'hui"
+                  groups={morningSpecificGroups}
+                  dateIso={todayIso}
+                />
+              </div>
+            )}
+          </div>
         }
         retour={
-          <FixedChecklist
-            title="Retour"
-            items={retourChecklist}
-            dateIso={todayIso}
-            headingId="retour-heading"
-            onToggle={toggleRetourChecklistItem}
-            hideTitle
-          />
-        }
-        soir={
-          <MomentSoirCard complete={soirComplete}>
+          <div className="flex flex-col gap-4">
+            <FixedChecklist
+              title="En rentrant de l'école"
+              items={retourChecklist}
+              dateIso={todayIso}
+              headingId="retour-heading"
+              onToggle={toggleRetourChecklistItem}
+              hideTitle
+            />
             {revisionsChecklist.length > 0 && (
-              <RevisionsChecklist
-                items={revisionsChecklist}
-                dateIso={todayIso}
-                onToggle={toggleRevisionsChecklistItem}
-              />
+              <div className="rounded-2xl bg-card p-4 shadow-brand ring-1 ring-border">
+                <RevisionsChecklist
+                  items={revisionsChecklist}
+                  dateIso={todayIso}
+                  onToggle={toggleRevisionsChecklistItem}
+                />
+              </div>
             )}
-
-            <div
-              className={
-                revisionsChecklist.length > 0
-                  ? "flex flex-col gap-4 border-t border-border pt-4"
-                  : "flex flex-col gap-4"
-              }
-            >
+            <div className="rounded-2xl bg-card p-4 shadow-brand ring-1 ring-border">
               <DevoirsList
                 devoirs={devoirsView}
                 onToggle={toggleDevoirDoneAction}
@@ -502,6 +558,17 @@ export default async function AccueilPage() {
                 scheduleSlots={slots}
               />
             </div>
+          </div>
+        }
+        soir={
+          <MomentSoirCard complete={soirComplete}>
+            <FixedChecklist
+              title="Préparer demain"
+              items={preparationSoirChecklist}
+              dateIso={todayIso}
+              headingId="preparation-soir-heading"
+              onToggle={togglePreparationSoirChecklistItem}
+            />
 
             <div className="flex flex-col gap-4 border-t border-border pt-4">
               {sacGroups.length > 0 || devoirsForTomorrow.length > 0 ? (

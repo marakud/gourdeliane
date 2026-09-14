@@ -56,6 +56,17 @@ describe("computeSoirCompletion (Story 2.7, FR-20 -- I/O matrix spec 2.7)", () =
     expect(computeSoirCompletion(input)).toBe(false);
   });
 
+  it("is incomplete while a general evening preparation is unchecked", () => {
+    const input: SoirCompletionInput = {
+      sacGroups: [],
+      revisionsItems: [],
+      preparationItems: [{ checked: true }, { checked: false }],
+      devoirsARendreDemain: [],
+    };
+
+    expect(computeSoirCompletion(input)).toBe(false);
+  });
+
   it("treats an empty Sac (no course tomorrow) as trivially complete", () => {
     const input: SoirCompletionInput = {
       sacGroups: [{ items: [] }],
@@ -194,6 +205,16 @@ describe("countSoirProgress (refonte visuelle -- même agrégation que computeSo
       devoirsARendreDemain: [{ done: false }],
     };
     expect(countSoirProgress(input)).toEqual({ done: 2, total: 4 });
+  });
+
+  it("includes the general evening preparations in the progress", () => {
+    const input: SoirCompletionInput = {
+      sacGroups: [],
+      revisionsItems: [],
+      preparationItems: [{ checked: true }, { checked: false }],
+      devoirsARendreDemain: [],
+    };
+    expect(countSoirProgress(input)).toEqual({ done: 1, total: 2 });
   });
 
   it("returns {done: 0, total: 0} when there is nothing at all to do", () => {

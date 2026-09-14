@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { listFixedChecklistItems, listSubjectsWithItems } from "@/data/checklist";
 import {
   CHECKLIST_TYPE_MATIN,
+  CHECKLIST_TYPE_PREPARATION_SOIR,
   CHECKLIST_TYPE_RETOUR,
   DEFAULT_MATIN_ITEMS,
+  DEFAULT_PREPARATION_SOIR_ITEMS,
   DEFAULT_RETOUR_ITEMS,
 } from "@/domain/checklist";
 import { computeWeekParity } from "@/domain/schedule";
@@ -14,6 +16,7 @@ import { getTodaySchoolDate, schoolDateToIso } from "@/domain/school-day";
 import {
   createFixedChecklistItem,
   createRetourChecklistItem,
+  createPreparationSoirChecklistItem,
 } from "@/actions/checklist";
 import { setCurrentWeekParity, setFirstNameAction } from "@/actions/settings";
 import { subscribeToPush } from "@/actions/push";
@@ -31,10 +34,11 @@ export default async function ReglagesPage() {
   await connection();
 
   const user = await requireCurrentUser();
-  const [subjects, matinItems, retourItems] = await Promise.all([
+  const [subjects, matinItems, retourItems, preparationSoirItems] = await Promise.all([
     listSubjectsWithItems(user.id),
     listFixedChecklistItems(user.id, CHECKLIST_TYPE_MATIN, DEFAULT_MATIN_ITEMS),
     listFixedChecklistItems(user.id, CHECKLIST_TYPE_RETOUR, DEFAULT_RETOUR_ITEMS),
+    listFixedChecklistItems(user.id, CHECKLIST_TYPE_PREPARATION_SOIR, DEFAULT_PREPARATION_SOIR_ITEMS),
   ]);
 
   // Semaine A/B (Story 1.4) : la parité affichée porte sur AUJOURD'HUI
@@ -93,6 +97,12 @@ export default async function ReglagesPage() {
         title="Retour"
         items={retourItems.map((item) => ({ id: item.id, label: item.label }))}
         createAction={createRetourChecklistItem}
+      />
+
+      <FixedItemsManager
+        title="Préparatifs du soir"
+        items={preparationSoirItems.map((item) => ({ id: item.id, label: item.label }))}
+        createAction={createPreparationSoirChecklistItem}
       />
 
       <form

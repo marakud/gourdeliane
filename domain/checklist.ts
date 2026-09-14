@@ -46,6 +46,18 @@ export const DEFAULT_MATIN_ITEMS = [
 // (déjà filtré par l'appelant, cf. data/checklist.ts), pas `sourceType`.
 export const CHECKLIST_TYPE_RETOUR = "RETOUR" as const;
 
+// Préparatifs généraux du soir, indépendants des matières : vêtements,
+// chaussures et dernière vérification de l'agenda. Le sac reste dérivé de
+// l'emploi du temps et des objets par matière.
+export const CHECKLIST_TYPE_PREPARATION_SOIR = "PREPARATION_SOIR" as const;
+
+export const DEFAULT_PREPARATION_SOIR_ITEMS = [
+  "Préparer mes vêtements pour demain",
+  "Préparer mes chaussures",
+  "Vérifier mon carnet ou mon agenda",
+  "Mettre à charger les appareils nécessaires",
+] as const;
+
 /**
  * Liste par défaut pré-remplie à la toute première consultation de "Retour"
  * pour un utilisateur (même mécanisme que `DEFAULT_MATIN_ITEMS` -- détectée

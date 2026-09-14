@@ -27,6 +27,7 @@ interface DevoirARendreDemainLike {
 export interface SoirCompletionInput {
   sacGroups: readonly SacGroupLike[];
   revisionsItems: readonly ChecklistItemLike[];
+  preparationItems?: readonly ChecklistItemLike[];
   /** Devoirs déjà filtrés par l'appelant sur `aRendre && échéance === demain`
    * -- cette fonction ne refait jamais ce filtrage (Boundaries spec 2.7 : un
    * devoir sans échéance ou échéant plus tard ne doit jamais atteindre ici). */
@@ -66,11 +67,12 @@ export function computeSoirCompletion(input: SoirCompletionInput): boolean {
   const sacItems = input.sacGroups.flatMap((group) => group.items);
   const sacComplete = isBlockComplete(sacItems);
   const revisionsComplete = isBlockComplete(input.revisionsItems);
+  const preparationComplete = isBlockComplete(input.preparationItems ?? []);
   const devoirsComplete = input.devoirsARendreDemain.every(
     (devoir) => devoir.done
   );
 
-  return sacComplete && revisionsComplete && devoirsComplete;
+  return sacComplete && revisionsComplete && preparationComplete && devoirsComplete;
 }
 
 /**
@@ -118,6 +120,7 @@ export function countSoirProgress(input: SoirCompletionInput): MomentProgress {
   const allItems = [
     ...sacItems,
     ...input.revisionsItems,
+    ...(input.preparationItems ?? []),
     ...input.devoirsARendreDemain.map((devoir) => ({ checked: devoir.done })),
   ];
   return countBlockProgress(allItems);
