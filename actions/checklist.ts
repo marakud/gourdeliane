@@ -7,6 +7,7 @@ import {
   CHECKLIST_SOURCE_TYPE_SUBJECT,
   CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
   CHECKLIST_TYPE_MATIN,
+  CHECKLIST_TYPE_PREPARATION_SOIR,
   CHECKLIST_TYPE_RETOUR,
   CHECKLIST_TYPE_REVISIONS,
   CHECKLIST_TYPE_SAC,
@@ -106,6 +107,7 @@ const KNOWN_CHECKLIST_TYPES = new Set<string>([
   CHECKLIST_TYPE_MATIN,
   CHECKLIST_TYPE_RETOUR,
   CHECKLIST_TYPE_REVISIONS,
+  CHECKLIST_TYPE_PREPARATION_SOIR,
 ]);
 const KNOWN_SOURCE_TYPES = new Set<string>([
   CHECKLIST_SOURCE_TYPE_SUBJECT_ITEM,
@@ -152,7 +154,8 @@ export async function toggleChecklistItem(
     // doit jamais la remettre en cause.
     if (
       resolvedChecklistType === CHECKLIST_TYPE_SAC ||
-      resolvedChecklistType === CHECKLIST_TYPE_REVISIONS
+      resolvedChecklistType === CHECKLIST_TYPE_REVISIONS ||
+      resolvedChecklistType === CHECKLIST_TYPE_PREPARATION_SOIR
     ) {
       await safeRecomputeSoirCompletion(userId);
     }
@@ -351,6 +354,37 @@ export async function createRetourChecklistItem(
     console.error("createRetourChecklistItem failed:", error);
     return { ok: false, error: "Impossible d'ajouter l'item. Réessaie." };
   }
+}
+
+export async function createPreparationSoirChecklistItem(
+  input: FixedChecklistItemFormInput
+): Promise<ActionResult<{ id: string }>> {
+  const label = input.label.trim();
+  if (!label) return { ok: false, error: "Le nom de l'item est requis." };
+  try {
+    const userId = await requireUserId();
+    const item = await createFixedChecklistItemData(
+      userId,
+      CHECKLIST_TYPE_PREPARATION_SOIR,
+      label
+    );
+    revalidateReglages();
+    revalidateAccueil();
+    return { ok: true, data: { id: item.id } };
+  } catch (error) {
+    console.error("createPreparationSoirChecklistItem failed:", error);
+    return { ok: false, error: "Impossible d'ajouter l'item. Réessaie." };
+  }
+}
+
+export async function togglePreparationSoirChecklistItem(
+  input: Omit<ToggleChecklistItemInput, "checklistType" | "sourceType">
+): Promise<ActionResult<null>> {
+  return toggleChecklistItem({
+    ...input,
+    checklistType: CHECKLIST_TYPE_PREPARATION_SOIR,
+    sourceType: CHECKLIST_SOURCE_TYPE_FIXED_ITEM,
+  });
 }
 
 /** Coche/décoche un item de "Retour" -- wrapper de `toggleChecklistItem`

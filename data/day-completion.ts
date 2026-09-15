@@ -1,6 +1,10 @@
 import { prisma } from "./prisma";
 import { getScheduleForUser, toUtcMidnight } from "./schedule";
-import { listChecklistItemStates, listSubjectItemsForSubjects } from "./checklist";
+import {
+  listChecklistItemStates,
+  listFixedChecklistItems,
+  listSubjectItemsForSubjects,
+} from "./checklist";
 import { listDevoirs } from "./homework";
 import {
   computeWeekParity,
@@ -17,7 +21,10 @@ import {
 } from "@/domain/school-day";
 import {
   CHECKLIST_TYPE_REVISIONS,
+  CHECKLIST_TYPE_PREPARATION_SOIR,
   CHECKLIST_TYPE_SAC,
+  DEFAULT_PREPARATION_SOIR_ITEMS,
+  deriveFixedChecklist,
   deriveRevisionsChecklist,
   deriveSacChecklist,
   partitionDevoirsARendreForSac,
@@ -216,13 +223,35 @@ export async function recomputeAndPersistSoirCompletion(
     )
     .map((devoir) => ({ done: devoir.done }));
 
+  const todayDateAsDate = new Date(`${todayIso}T00:00:00.000Z`);
+  const [preparationItems, preparationStates] = await Promise.all([
+    listFixedChecklistItems(
+      userId,
+      CHECKLIST_TYPE_PREPARATION_SOIR,
+      DEFAULT_PREPARATION_SOIR_ITEMS
+    ),
+    listChecklistItemStates(
+      userId,
+      todayDateAsDate,
+      CHECKLIST_TYPE_PREPARATION_SOIR
+    ),
+  ]);
+  const preparationChecklist = deriveFixedChecklist(
+    preparationItems.map((item) => ({ id: item.id, label: item.label })),
+    preparationStates.map((state) => ({
+      sourceType: state.sourceType,
+      sourceId: state.sourceId,
+      checked: state.checked,
+    }))
+  );
+
   const complete = computeSoirCompletion({
     sacGroups,
     revisionsItems,
+    preparationItems: preparationChecklist,
     devoirsARendreDemain,
   });
 
-  const todayDateAsDate = new Date(`${todayIso}T00:00:00.000Z`);
   await upsertDayCompletion(
     userId,
     todayDateAsDate,

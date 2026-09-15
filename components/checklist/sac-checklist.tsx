@@ -42,6 +42,7 @@ export interface SacChecklistDevoir {
 export interface SacChecklistProps {
   groups: SacChecklistGroup[];
   devoirsForTomorrow?: SacChecklistDevoir[];
+  title?: string;
   // Jour pour lequel la checklist est préparée ("demain"), ISO "yyyy-MM-dd"
   // -- transmis tel quel à la Server Action (AD-4 : déjà calculé côté
   // serveur par app/(accueil)/page.tsx, jamais recalculé ici).
@@ -63,6 +64,7 @@ function itemKey(sourceType: string, sourceId: string): string {
 export function SacChecklist({
   groups,
   devoirsForTomorrow = [],
+  title = "Avant d'aller se coucher",
   dateIso,
 }: SacChecklistProps) {
   const [checkedByKey, setCheckedByKey] = useState<Record<string, boolean>>(
@@ -130,7 +132,7 @@ export function SacChecklist({
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-heading text-base font-semibold text-foreground">
-          Avant d&apos;aller se coucher
+          {title}
         </h3>
         {total > 0 && (
           <span className="text-sm font-medium text-muted-foreground">

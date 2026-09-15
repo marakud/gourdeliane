@@ -228,6 +228,90 @@ export interface DevoirTaskView {
   taskView: TaskViewCategory;
 }
 
+export const TASK_PERIOD_ALL = "ALL" as const;
+export const TASK_PERIOD_TODAY = "TODAY" as const;
+export const TASK_PERIOD_TOMORROW = "TOMORROW" as const;
+export const TASK_PERIOD_THIS_WEEK = "THIS_WEEK" as const;
+export const TASK_PERIOD_NEXT_WEEK = "NEXT_WEEK" as const;
+export const TASK_PERIOD_THIS_MONTH = "THIS_MONTH" as const;
+
+export type TaskPeriodFilter =
+  | typeof TASK_PERIOD_ALL
+  | typeof TASK_PERIOD_TODAY
+  | typeof TASK_PERIOD_TOMORROW
+  | typeof TASK_PERIOD_THIS_WEEK
+  | typeof TASK_PERIOD_NEXT_WEEK
+  | typeof TASK_PERIOD_THIS_MONTH;
+
+/** Date qui sert au classement de "Mes tâches" : un rendu déjà dépassé
+ * reste attaché à sa véritable échéance ; sinon la date choisie pour faire
+ * le travail prime, puis la date de rendu. */
+export function getEffectiveTaskDateIso(
+  devoir: Pick<
+    DevoirTaskView,
+    "done" | "echeanceDaysRemaining" | "echeanceIso" | "planDateIso"
+  >
+): string | null {
+  if (!devoir.done && (devoir.echeanceDaysRemaining ?? 0) < 0) {
+    return devoir.echeanceIso;
+  }
+  return devoir.planDateIso ?? devoir.echeanceIso;
+}
+
+function addDaysIso(dateIso: string, days: number): string {
+  const [year, month, day] = parseIsoDate(dateIso);
+  const date = new Date(Date.UTC(year, month, day + days));
+  return date.toISOString().slice(0, 10);
+}
+
+function mondayOffset(dateIso: string): number {
+  const [year, month, day] = parseIsoDate(dateIso);
+  const weekday = new Date(Date.UTC(year, month, day)).getUTCDay();
+  return weekday === 0 ? 6 : weekday - 1;
+}
+
+export function taskMatchesPeriod(
+  devoir: Pick<
+    DevoirTaskView,
+    "done" | "echeanceDaysRemaining" | "echeanceIso" | "planDateIso"
+  >,
+  period: TaskPeriodFilter,
+  todayIso: string
+): boolean {
+  if (period === TASK_PERIOD_ALL) return true;
+  const dateIso = getEffectiveTaskDateIso(devoir);
+  if (!dateIso) return false;
+  if (period === TASK_PERIOD_TODAY) return dateIso === todayIso;
+  if (period === TASK_PERIOD_TOMORROW) return dateIso === addDaysIso(todayIso, 1);
+
+  const thisMonday = addDaysIso(todayIso, -mondayOffset(todayIso));
+  if (period === TASK_PERIOD_THIS_WEEK) {
+    return dateIso >= thisMonday && dateIso <= addDaysIso(thisMonday, 6);
+  }
+  if (period === TASK_PERIOD_NEXT_WEEK) {
+    const nextMonday = addDaysIso(thisMonday, 7);
+    return dateIso >= nextMonday && dateIso <= addDaysIso(nextMonday, 6);
+  }
+  return dateIso.slice(0, 7) === todayIso.slice(0, 7);
+}
+
+export function sortTasksByEffectiveDate<T extends Pick<
+  DevoirTaskView,
+  "done" | "echeanceDaysRemaining" | "echeanceIso" | "planDateIso" | "planTime"
+>>(devoirs: readonly T[]): T[] {
+  return [...devoirs].sort((a, b) => {
+    const aDate = getEffectiveTaskDateIso(a);
+    const bDate = getEffectiveTaskDateIso(b);
+    if (aDate === null && bDate === null) return Number(a.done) - Number(b.done);
+    if (aDate === null) return 1;
+    if (bDate === null) return -1;
+    const byDate = aDate.localeCompare(bDate);
+    if (byDate !== 0) return byDate;
+    const byTime = (a.planTime ?? "99:99").localeCompare(b.planTime ?? "99:99");
+    return byTime !== 0 ? byTime : Number(a.done) - Number(b.done);
+  });
+}
+
 /**
  * Enrichit un devoir brut en vue prête à afficher -- échéance ET
  * planification formatées séparément (jours restants, libellé), plus

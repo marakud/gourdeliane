@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, CalendarDays, ListChecks, NotebookText, TrendingUp } from "lucide-react";
+import { Brain, CalendarDays, Home, ListChecks, NotebookText } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // Navigation basse (Accueil / Mes tâches / Emploi du temps / Cahier de texte
-// / Progression). Réglages est volontairement absent de cette barre
+// / Mémoire). Réglages est volontairement absent de cette barre
 // (accessible ailleurs, cf. app/reglages). "Mes tâches" (évolution
 // CartableFlow) juste après Accueil : hub central des devoirs, aussi central
 // au quotidien que l'Accueil lui-même -- ListChecks plutôt qu'une nouvelle
@@ -36,10 +36,10 @@ const TABS = [
     icon: NotebookText,
   },
   {
-    href: "/progression",
-    label: "Progression",
-    fullLabel: "Progression",
-    icon: TrendingUp,
+    href: "/memoire",
+    label: "Mémoire",
+    fullLabel: "Mémoire",
+    icon: Brain,
   },
 ] as const;
 

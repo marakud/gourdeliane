@@ -5,6 +5,15 @@ import {
   computeEstimatedWorkload,
   filterDevoirsForDate,
   formatEstimatedDuration,
+  getEffectiveTaskDateIso,
+  sortTasksByEffectiveDate,
+  taskMatchesPeriod,
+  TASK_PERIOD_ALL,
+  TASK_PERIOD_NEXT_WEEK,
+  TASK_PERIOD_THIS_MONTH,
+  TASK_PERIOD_THIS_WEEK,
+  TASK_PERIOD_TODAY,
+  TASK_PERIOD_TOMORROW,
   TASK_VIEW_DONE,
   TASK_VIEW_LATER,
   TASK_VIEW_OVERDUE,
@@ -12,6 +21,61 @@ import {
   TASK_VIEW_TODAY,
   TASK_VIEW_TOMORROW,
 } from "./homework";
+
+const taskDates = (
+  planDateIso: string | null,
+  echeanceIso: string | null,
+  options: { done?: boolean; echeanceDaysRemaining?: number | null; planTime?: string | null } = {}
+) => ({
+  done: options.done ?? false,
+  planDateIso,
+  echeanceIso,
+  echeanceDaysRemaining: options.echeanceDaysRemaining ?? null,
+  planTime: options.planTime ?? null,
+});
+
+describe("classement chronologique de Mes tâches", () => {
+  const today = "2026-09-15"; // mardi
+
+  it("utilise la planification avant l'échéance", () => {
+    expect(getEffectiveTaskDateIso(taskDates("2026-09-17", "2026-09-25"))).toBe("2026-09-17");
+  });
+
+  it("conserve l'échéance dépassée comme date effective", () => {
+    expect(getEffectiveTaskDateIso(taskDates("2026-09-20", "2026-09-14", { echeanceDaysRemaining: -1 }))).toBe("2026-09-14");
+  });
+
+  it("n'applique aucun filtre avec Toutes les dates, même sans date", () => {
+    expect(taskMatchesPeriod(taskDates(null, null), TASK_PERIOD_ALL, today)).toBe(true);
+  });
+
+  it("filtre aujourd'hui et demain", () => {
+    expect(taskMatchesPeriod(taskDates(today, null), TASK_PERIOD_TODAY, today)).toBe(true);
+    expect(taskMatchesPeriod(taskDates("2026-09-16", null), TASK_PERIOD_TOMORROW, today)).toBe(true);
+  });
+
+  it("utilise des semaines calendaires du lundi au dimanche", () => {
+    expect(taskMatchesPeriod(taskDates("2026-09-20", null), TASK_PERIOD_THIS_WEEK, today)).toBe(true);
+    expect(taskMatchesPeriod(taskDates("2026-09-21", null), TASK_PERIOD_THIS_WEEK, today)).toBe(false);
+    expect(taskMatchesPeriod(taskDates("2026-09-21", null), TASK_PERIOD_NEXT_WEEK, today)).toBe(true);
+    expect(taskMatchesPeriod(taskDates("2026-09-27", null), TASK_PERIOD_NEXT_WEEK, today)).toBe(true);
+  });
+
+  it("filtre le mois calendaire en cours", () => {
+    expect(taskMatchesPeriod(taskDates("2026-09-30", null), TASK_PERIOD_THIS_MONTH, today)).toBe(true);
+    expect(taskMatchesPeriod(taskDates("2026-10-01", null), TASK_PERIOD_THIS_MONTH, today)).toBe(false);
+  });
+
+  it("trie par date puis par heure et place les tâches sans date à la fin", () => {
+    const result = sortTasksByEffectiveDate([
+      { ...taskDates(null, null), id: "sans-date" },
+      { ...taskDates("2026-09-17", null, { planTime: "18:00" }), id: "tard" },
+      { ...taskDates("2026-09-16", null), id: "demain" },
+      { ...taskDates("2026-09-17", null, { planTime: "16:00" }), id: "tot" },
+    ]);
+    expect(result.map((task) => task.id)).toEqual(["demain", "tot", "tard", "sans-date"]);
+  });
+});
 
 describe("computeDaysRemaining (spec 2.4 amendment I/O matrix)", () => {
   it("returns 0 when the échéance is today", () => {

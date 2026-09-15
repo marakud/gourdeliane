@@ -56,6 +56,7 @@ model User {
   pushSubscriptions           PushSubscription[]
   lessonLogs                  LessonLog[]
   homeworkTimeSessions        HomeworkTimeSession[]
+  memoryPoints                MemoryPoint[]
 }
 
 // Jour de la semaine d'un créneau récurrent.
@@ -95,6 +96,7 @@ model Subject {
   items         SubjectItem[]
   devoirs       Devoir[]
   lessonLogs    LessonLog[]
+  memoryPoints  MemoryPoint[]
 
   // Une matière est réutilisée par son nom : deux créneaux sur "Maths"
   // partagent la même Subject, jamais une doublée.
@@ -327,6 +329,24 @@ model LessonLog {
   updatedAt DateTime @updatedAt
 
   @@index([userId, date])
+}
+
+model MemoryPoint {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subjectId      String
+  subject        Subject   @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  content        String
+  note           String?
+  status         String    @default("TO_REVIEW")
+  reviewCount    Int       @default(0)
+  lastReviewedAt DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId, status])
+  @@index([userId, subjectId])
 }
 
 // Complétude persistée par jour scolaire et par moment (Story 2.7, AD-5) --

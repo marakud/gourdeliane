@@ -115,6 +115,7 @@ export default async function MesTachesPage() {
 
       <MesTachesView
         devoirs={devoirsView}
+        todayIso={todayIso}
         subjects={homeworkSubjects}
         scheduleSlots={slots}
         onToggle={toggleDevoirDoneAction}
