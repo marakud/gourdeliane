@@ -66,6 +66,7 @@ import { GreetingCard } from "@/components/moment/greeting-card";
 import { MomentSoirCard } from "@/components/moment/moment-soir-card";
 import { MomentTabs } from "@/components/moment/moment-tabs";
 import { EmptyState } from "@/components/ui/empty-state";
+import { DailyReportDialog } from "@/components/daily-report/daily-report-dialog";
 
 /**
  * Date + heure du message d'accueil, en America/Guadeloupe fixe (AD-4) --
@@ -530,6 +531,7 @@ export default async function AccueilPage() {
         }
         retour={
           <div className="flex flex-col gap-4">
+            <DailyReportDialog subjects={homeworkSubjects} defaultDateIso={todayIso} />
             <FixedChecklist
               title="En rentrant de l'école"
               items={retourChecklist}
